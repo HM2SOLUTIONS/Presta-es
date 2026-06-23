@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prestações</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#F7F8FA;--surface:#fff;--surface2:#F0F2F5;--border:#E2E5EA;
+  --text:#111827;--text2:#6B7280;--text3:#9CA3AF;
+  --accent:#1A56DB;--accent-l:#EBF0FD;--accent-d:#1340B0;
+  --green:#0E7A4D;--green-bg:#ECFDF5;
+  --yellow:#92400E;--yellow-bg:#FFFBEB;
+  --red:#B91C1C;--red-bg:#FEF2F2;
+  --mono:'JetBrains Mono',monospace;
+  --radius:8px;--shadow:0 1px 3px rgba(0,0,0,.08);--shadow-lg:0 10px 25px rgba(0,0,0,.1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;min-height:100vh}
+
+/* Setup screen */
+#setupScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.setup-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem;width:480px;max-width:100%;box-shadow:var(--shadow-lg)}
+.setup-card h1{font-size:20px;font-weight:600;margin-bottom:.5rem;display:flex;align-items:center;gap:10px}
+.setup-card p{color:var(--text2);font-size:13px;margin-bottom:1.5rem;line-height:1.6}
+.setup-steps{background:var(--surface2);border-radius:var(--radius);padding:1rem;margin-bottom:1.5rem;font-size:12px;line-height:1.8;color:var(--text2)}
+.setup-steps strong{color:var(--text)}
+.setup-steps a{color:var(--accent);text-decoration:none}
+.setup-steps a:hover{text-decoration:underline}
+
+/* App */
+#appScreen{display:none}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.logo{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;background:var(--accent);border-radius:50%}
+.notion-badge{font-size:11px;background:var(--accent-l);color:var(--accent-d);padding:2px 8px;border-radius:10px;font-weight:500}
+.main{max-width:1200px;margin:0 auto;padding:24px 24px 80px}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+.stat-label{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.stat-val{font-size:26px;font-weight:600;font-family:var(--mono)}
+.stat-val.green{color:var(--green)}.stat-val.yellow{color:#D97706}.stat-val.red{color:var(--red)}
+
+.month-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.month-pill{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;font-family:var(--mono);border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.month-pill:hover{border-color:var(--accent);color:var(--accent)}
+.month-pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.month-pill .count{background:rgba(255,255,255,.25);border-radius:10px;padding:0 6px;font-size:11px;min-width:18px;text-align:center}
+.month-pill:not(.active) .count{background:var(--surface2);color:var(--text2)}
+
+.toolbar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.toolbar-left{display:flex;gap:8px;flex:1;flex-wrap:wrap}
+
+input,select,textarea{height:34px;padding:0 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:'Inter',sans-serif;background:var(--surface);color:var(--text);outline:none;transition:border-color .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.search-wrap{position:relative}
+.search-wrap input{padding-left:32px;width:200px}
+.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none}
+
+.sel-bar{display:none;align-items:center;gap:10px;background:var(--accent-l);border:1px solid #BFCFFA;border-radius:var(--radius);padding:10px 16px;margin-bottom:12px;font-size:13px;color:var(--accent-d)}
+.sel-bar.show{display:flex}
+
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{padding:10px 14px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);background:var(--surface2);border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr{transition:background .1s}
+tbody tr:hover{background:var(--surface2)}
+tbody tr:not(:last-child) td{border-bottom:1px solid var(--border)}
+td{padding:10px 14px;vertical-align:middle}
+
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:500;white-space:nowrap;cursor:pointer}
+.badge-ni{background:var(--yellow-bg);color:var(--yellow)}
+.badge-em{background:var(--accent-l);color:var(--accent-d)}
+.badge-ok{background:var(--green-bg);color:var(--green)}
+.tag{display:inline-block;padding:2px 6px;border-radius:4px;font-size:11px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);margin:1px;font-family:var(--mono)}
+
+.btn{height:34px;padding:0 14px;border-radius:6px;font-size:13px;font-weight:500;font-family:'Inter',sans-serif;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--surface2)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:var(--accent-d);border-color:var(--accent-d)}
+.btn-danger{color:var(--red)}.btn-danger:hover{background:var(--red-bg);border-color:#FCA5A5}
+.btn-sm{height:28px;padding:0 9px;font-size:12px;border-radius:5px}
+.btn-icon{width:28px;padding:0;justify-content:center}
+.prazo-late{color:var(--red);font-weight:500}
+
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;padding:20px}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:12px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal-header{padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between}
+.modal-header h2{font-size:16px;font-weight:600}
+.modal-body{padding:20px 24px}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%}
+.field textarea{height:160px;resize:vertical;line-height:1.6;padding:8px 10px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.span-2{grid-column:1/-1}
+
+.drop-zone{border:2px dashed var(--border);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all .15s;color:var(--text2);font-size:13px}
+.drop-zone:hover{border-color:var(--accent);background:var(--accent-l)}
+
+.loading{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text2);gap:12px;font-size:14px}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.empty{text-align:center;padding:60px 24px;color:var(--text2)}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+
+.toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:12px 18px;border-radius:var(--radius);font-size:13px;box-shadow:var(--shadow-lg);z-index:200;display:flex;align-items:center;gap:8px;transform:translateY(80px);opacity:0;transition:all .25s ease}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{background:var(--green)}
+.toast.error{background:var(--red)}
+
+.sync-indicator{font-size:12px;color:var(--text3);display:flex;align-items:center;gap:5px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.sync-dot.syncing{background:#D97706;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.new-month-btn{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--text3);cursor:pointer;transition:all .15s;font-family:var(--mono)}
+.new-month-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.search-wrap input{width:140px}.topbar{padding:0 16px}.main{padding:16px 16px 60px}}
+</style>
+</head>
+<body>
+
+<!-- Setup Screen -->
+<div id="setupScreen">
+  <div class="setup-card">
+    <h1>📋 Prestações <span style="font-size:13px;font-weight:400;color:var(--text2)">× Notion</span></h1>
+    <p>Para sincronizar com o seu Notion em qualquer PC, precisa de uma <strong>Integration Key</strong> (gratuita). É criada em 2 minutos e fica guardada no browser.</p>
+    <div class="setup-steps">
+      <strong>Como criar a Integration Key:</strong><br>
+      1. Aceda a <a href="https://www.notion.so/profile/integrations" target="_blank">notion.so/profile/integrations</a><br>
+      2. Clique em <strong>"New integration"</strong><br>
+      3. Dê um nome (ex: "Prestações App") e clique <strong>Save</strong><br>
+      4. Copie o <strong>Internal Integration Secret</strong> (começa por <code>ntn_</code>)<br>
+      5. Cole abaixo e clique Ligar<br><br>
+      <strong>Importante:</strong> Na sua database PRESTAÇÕES no Notion, clique em <strong>⋯ → Connections → adicionar a integração</strong> que criou.
+    </div>
+    <div class="field">
+      <label>Integration Key</label>
+      <input type="password" id="tokenInput" placeholder="ntn_xxxxxxxxxxxxxxxx" style="width:100%;font-family:var(--mono)">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="connectNotion()">
+      Ligar ao Notion →
+    </button>
+    <div id="setupError" style="display:none;margin-top:12px;padding:10px;background:var(--red-bg);border-radius:6px;font-size:13px;color:var(--red)"></div>
+  </div>
+</div>
+
+<!-- App Screen -->
+<div id="appScreen">
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      Prestações
+      <span class="notion-badge">Notion</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="sync-indicator"><div class="sync-dot" id="syncDot"></div><span id="syncLabel">Sincronizado</span></div>
+      <button class="btn btn-sm" onclick="loadData()">↻ Atualizar</button>
+      <button class="btn btn-sm" onclick="disconnect()" title="Desligar Notion" style="color:var(--text3)">Desligar</button>
+      <button class="btn btn-sm btn-primary" onclick="openAdd()">+ Nova entrada</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="stats" id="stats"></div>
+    <div class="month-tabs" id="monthTabs"></div>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="fSearch" placeholder="Pesquisar cliente…" oninput="render()">
+        </div>
+        <select id="fStatus" onchange="render()">
+          <option value="">Todos os estados</option>
+          <option value="Não iniciado">Não iniciado</option>
+          <option value="Em andamento">Em andamento</option>
+          <option value="Concluído">Concluído</option>
+        </select>
+      </div>
+      <button class="btn btn-sm" id="btnSendSel" style="display:none" onclick="openEmailSel()">✉ Enviar selecionados</button>
+    </div>
+
+    <div class="sel-bar" id="selBar">
+      ✓ <span id="selCount">0</span> selecionados
+      <button class="btn btn-sm" onclick="clearSel()">Limpar</button>
+      <button class="btn btn-sm btn-primary" onclick="openEmailSel()">✉ Enviar email</button>
+      <button class="btn btn-sm" onclick="openDupSel()">⧉ Duplicar para mês seguinte</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36px"><input type="checkbox" id="chkAll" onchange="toggleAll(this)"></th>
+            <th>Cliente</th>
+            <th>Estado</th>
+            <th>Nº</th>
+            <th>Tipo de tarefa</th>
+            <th>Prazo</th>
+            <th style="width:120px">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Entry Modal -->
+<div class="overlay" id="entryModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="entryTitle">Nova entrada</h2>
+      <button class="btn btn-sm btn-icon" onclick="closeModal('entryModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="field span-2"><label>Cliente</label><input id="aCliente" type="text" placeholder="Nome do cliente"></div>
+        <div class="field">
+          <label>Estado</label>
+          <select id="aStatus">
+            <option>Não iniciado</option><option>Em andamento</option><option>Concluído</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Nº</label>
+          <select id="aN"><option value="">—</option><option>1</option><option>2</option><option>3</option><option>5</option><option>8</option></select>
+        </div>
+        <div class="field span-2">
+          <label>Tipo de tarefa</label>
+          <div id="tipoCheckboxes" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+        </div>
+        <div class="field">
+          <label>Mês (Selecionar)</label>
+          <select id="aMes">
+            <option>JAN/2026</option><option>FEV/2026</option><option>MAR/2026</option><option>ABR/2026</option>
+            <option>MAI/2026</option><option selected>JUN/2026</option><option>JUL/2026</option><option>AGO/2026</option>
+            <option>SET/2026</option><option>OUT/2026</option><option>NOV/2026</option><option>DEZ/2026</option>
+          </select>
+        </div>
+        <div class="field"><label>Prazo</label><input id="aPrazo" type="date"></div>
+        <div class="field span-2"><label>Email do cliente</label><input id="aEmail" type="email" placeholder="cliente@email.com"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('entryModal')">Cancelar</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveEntry()">Guardar no Notion</button>
+    </div>
+  </div>
+</div>
+
+<!-- Email Modal -->
+<div class="overlay" id="emailModal">
+  <div class="modal" style="width:580px">
+    <div class="modal-header">
+      <h2>✉ Enviar por email</h2>
+      <button class="btn btn-sm btn-icon" onclick="closeModal('emailModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="field"><label>Para</label><input id="eTo" type="email" placeholder="cliente@email.com"></div>
+        <div class="field"><label>CC (opcional)</label><input id="eCc" type="email"></div>
+      </div>
+      <div class="field"><label>Assunto</label><input id="eSubj" type="text"></div>
+      <div class="field"><label>Mensagem</label><textarea id="eBody"></textarea></div>
+      <div class="field">
+        <label>Anexos</label>
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='var(--accent-l)'"
+          ondragleave="this.style.borderColor='var(--border)';this.style.background=''"
+          ondrop="handleDrop(event)">
+          📎 Clique ou arraste ficheiros para anexar
+        </div>
+        <input type="file" id="fileInput" multiple style="display:none" onchange="handleFiles(this.files)">
+        <div id="attachList" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
+      </div>
+      <div id="attachNote" style="font-size:11px;color:var(--text3);margin-top:4px;display:none">
+        ℹ️ O cliente de email irá abrir com assunto e corpo preenchidos. Arraste os ficheiros listados para a janela do email.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="copyEmailText()">📋 Copiar texto</button>
+      <button class="btn" onclick="closeModal('emailModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="doSendEmail()">✉ Abrir no email</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dup Modal -->
+<div class="overlay" id="dupModal">
+  <div class="modal" style="width:400px">
+    <div class="modal-header"><h2>⧉ Duplicar mês</h2><button class="btn btn-sm btn-icon" onclick="closeModal('dupModal')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Copia as entradas de <strong id="dupFrom"></strong> para o mês seguinte, repondo o estado para "Não iniciado".</p>
+      <div class="field"><label>Mês de destino</label><input id="dupMes" type="text" placeholder="ex: JUL/2026" style="font-family:var(--mono)"></div>
+      <div class="field"><label>Novo prazo para todas (opcional)</label><input id="dupPrazo" type="date"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('dupModal')">Cancelar</button>
+      <button class="btn btn-primary" id="dupBtn" onclick="doDuplicate()">Duplicar no Notion →</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const DB_ID = '29696dd2-e408-808a-873e-000bdeeadb05';
+const TIPOS = ['SS ADV','IRC 2024','Prestação IRS 2024','OSS','IVA','DMR','RENT IRS'];
+const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+const TOKEN_KEY = 'prestacoes_notion_token';
+const EMAILS_KEY = 'prestacoes_emails';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let token = '';
+let data = [];
+let activeMes = 'JUN/2026';
+let selected = new Set();
+let editingId = null;
+let attachedFiles = [];
+let emailsMap = {};
+
+// ── Proxy helper ───────────────────────────────────────────────────────────
+// Notion API blocks CORS from browsers, so we use a public CORS proxy
+const PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.codetabs.com/v1/proxy?quest=',
+  'https://thingproxy.freeboard.io/fetch/',
+];
+
+async function notionReq(path, method='GET', body=null) {
+  setSyncing(true);
+  const target = 'https://api.notion.com' + path;
+  const opts = {
+    method,
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  let lastErr;
+  for (const proxy of PROXIES) {
+    try {
+      const res = await fetch(proxy + encodeURIComponent(target), opts);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Erro Notion API');
+      setSyncing(false);
+      return json;
+    } catch(e) { lastErr = e; }
+  }
+  setSyncing(false);
+  throw lastErr;
+}
+
+// ── Setup ──────────────────────────────────────────────────────────────────
+async function connectNotion() {
+  const t = document.getElementById('tokenInput').value.trim();
+  if (!t) return;
+  token = t;
+  try {
+    // test connection
+    await notionReq('/v1/databases/' + DB_ID);
+    localStorage.setItem(TOKEN_KEY, t);
+    emailsMap = JSON.parse(localStorage.getItem(EMAILS_KEY) || '{}');
+    showApp();
+    await loadData();
+  } catch(e) {
+    setSyncing(false);
+    document.getElementById('setupError').style.display = 'block';
+    document.getElementById('setupError').textContent = 'Erro: ' + e.message + '. Verifique a key e se adicionou a integração à database no Notion.';
+  }
+}
+
+function showApp() {
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+}
+
+function disconnect() {
+  if (!confirm('Desligar do Notion? A Integration Key será removida.')) return;
+  localStorage.removeItem(TOKEN_KEY);
+  token = '';
+  document.getElementById('setupScreen').style.display = 'flex';
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('tokenInput').value = '';
+}
+
+// ── Load data ──────────────────────────────────────────────────────────────
+async function loadData() {
+  document.getElementById('tbody').innerHTML = '<tr><td colspan="7"><div class="loading"><div class="spinner"></div> A carregar do Notion…</div></td></tr>';
+  try {
+    let all = [], cursor = undefined;
+    do {
+      const body = { page_size: 100 };
+      if (cursor) body.start_cursor = cursor;
+      const res = await notionReq('/v1/databases/' + DB_ID + '/query', 'POST', body);
+      all = all.concat(res.results);
+      cursor = res.has_more ? res.next_cursor : undefined;
+    } while(cursor);
+
+    data = all.map(p => ({
+      id: p.id,
+      cliente: p.properties['Cliente']?.title?.[0]?.plain_text || '',
+      status: p.properties['Status']?.status?.name || 'Não iniciado',
+      n: p.properties['Nº']?.select?.name || null,
+      tipo: (p.properties['Tipo de tarefa']?.multi_select || []).map(x => x.name),
+      mes: p.properties['Selecionar']?.select?.name || '',
+      prazo: p.properties['Prazo']?.date?.start || null,
+      url: p.url,
+    }));
+
+    // Determine active month: prefer current month
+    const months = getMonths();
+    if (!months.includes(activeMes) && months.length) activeMes = months[0];
+    render();
+    toast('Dados carregados do Notion', 'success');
+  } catch(e) {
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">⚠️</div>Erro ao carregar: ${e.message}</div></td></tr>`;
+    toast('Erro ao carregar: ' + e.message, 'error');
+  }
+}
+
+// ── Months ─────────────────────────────────────────────────────────────────
+function getMonths() {
+  const m = [...new Set(data.map(r => r.mes).filter(Boolean))];
+  m.sort((a,b) => {
+    const toN = s => { const [mm,yy] = s.split('/'); return parseInt(yy)*100 + MESES.indexOf(mm); };
+    return toN(b) - toN(a);
+  });
+  return m;
+}
+
+function nextMonthStr(mes) {
+  const [mm, yy] = mes.split('/');
+  const i = MESES.indexOf(mm);
+  if (i === 11) return 'JAN/' + (parseInt(yy)+1);
+  return MESES[i+1] + '/' + yy;
+}
+
+function renderMonths() {
+  const months = getMonths();
+  document.getElementById('monthTabs').innerHTML = months.map(m => {
+    const count = data.filter(r => r.mes === m).length;
+    return `<div style="display:inline-flex;align-items:center;gap:2px">
+      <button class="month-pill ${m===activeMes?'active':''}" onclick="switchMonth('${m}')">${m}<span class="count">${count}</span></button>
+      <button style="height:24px;width:20px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-size:13px;border-radius:4px" title="Duplicar ${m}" onclick="openDup('${m}')" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⧉</button>
+    </div>`;
+  }).join('') + `<button class="new-month-btn" onclick="openDupCurrent()">+ Mês seguinte</button>`;
+}
+
+function switchMonth(m) { activeMes = m; selected.clear(); render(); }
+
+// ── Stats ──────────────────────────────────────────────────────────────────
+function renderStats() {
+  const rows = data.filter(r => r.mes === activeMes);
+  const today = new Date();
+  const total = rows.length;
+  const done = rows.filter(r => r.status === 'Concluído').length;
+  const pend = rows.filter(r => r.status === 'Não iniciado').length;
+  const late = rows.filter(r => r.prazo && new Date(r.prazo) < today && r.status !== 'Concluído').length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-label">Total</div><div class="stat-val">${total}</div></div>
+    <div class="stat"><div class="stat-label">Concluídos</div><div class="stat-val green">${done}</div></div>
+    <div class="stat"><div class="stat-label">Pendentes</div><div class="stat-val yellow">${pend}</div></div>
+    <div class="stat"><div class="stat-label">Em atraso</div><div class="stat-val ${late>0?'red':''}">${late}</div></div>`;
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function filtered() {
+  const q = document.getElementById('fSearch').value.toLowerCase();
+  const st = document.getElementById('fStatus').value;
+  return data.filter(r =>
+    r.mes === activeMes &&
+    (!st || r.status === st) &&
+    (!q || r.cliente.toLowerCase().includes(q))
+  );
+}
+
+function prazoDisplay(p) {
+  if (!p) return '<span style="color:var(--text3)">—</span>';
+  const d = new Date(p), today = new Date();
+  const diff = Math.round((d-today)/86400000);
+  const str = d.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'});
+  if (diff < 0) return `<span class="prazo-late">⚠ ${str}</span>`;
+  if (diff <= 3) return `<span style="color:#D97706;font-weight:500">${str}</span>`;
+  return str;
+}
+
+function statusBadge(s) {
+  if (s==='Concluído') return `<span class="badge badge-ok">✓ ${s}</span>`;
+  if (s==='Em andamento') return `<span class="badge badge-em">↻ ${s}</span>`;
+  return `<span class="badge badge-ni">◎ ${s}</span>`;
+}
+
+function render() {
+  const rows = filtered();
+  if (!rows.length) {
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><div>Sem entradas para este mês</div><div style="font-size:12px;margin-top:6px;color:var(--text3)">Use "+ Nova entrada" para adicionar</div></div></td></tr>`;
+  } else {
+    document.getElementById('tbody').innerHTML = rows.map(r => `
+      <tr>
+        <td><input type="checkbox" ${selected.has(r.id)?'checked':''} onchange="toggleSel('${r.id}',this)"></td>
+        <td style="font-weight:500">${r.cliente}</td>
+        <td><span onclick="cycleStatus('${r.id}')" title="Clique para mudar estado">${statusBadge(r.status)}</span></td>
+        <td style="font-family:var(--mono);color:var(--text2)">${r.n||'—'}</td>
+        <td>${(r.tipo||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
+        <td>${prazoDisplay(r.prazo)}</td>
+        <td><div style="display:flex;gap:4px">
+          <button class="btn btn-sm btn-icon" onclick="openEmail('${r.id}')" title="Enviar email">✉</button>
+          <button class="btn btn-sm btn-icon" onclick="openEdit('${r.id}')" title="Editar">✏</button>
+          <a href="${r.url}" target="_blank" class="btn btn-sm btn-icon" title="Abrir no Notion">↗</a>
+          <button class="btn btn-sm btn-icon btn-danger" onclick="deleteRow('${r.id}')" title="Arquivar">✕</button>
+        </div></td>
+      </tr>`).join('');
+  }
+  renderStats();
+  renderMonths();
+  updateSelBar();
+}
+
+// ── Selection ──────────────────────────────────────────────────────────────
+function toggleSel(id,el){ if(el.checked) selected.add(id); else selected.delete(id); updateSelBar(); }
+function toggleAll(el){ filtered().forEach(r=>{ if(el.checked) selected.add(r.id); else selected.delete(r.id); }); render(); }
+function clearSel(){ selected.clear(); render(); }
+function updateSelBar(){
+  const n = selected.size;
+  document.getElementById('selBar').classList.toggle('show', n>0);
+  document.getElementById('selCount').textContent = n;
+  document.getElementById('btnSendSel').style.display = n>0?'inline-flex':'none';
+}
+
+// ── Status cycle ───────────────────────────────────────────────────────────
+async function cycleStatus(id) {
+  const r = data.find(x=>x.id===id);
+  const cycle = ['Não iniciado','Em andamento','Concluído'];
+  const newStatus = cycle[(cycle.indexOf(r.status)+1)%3];
+  r.status = newStatus; render();
+  try {
+    await notionReq('/v1/pages/'+id,'PATCH',{properties:{Status:{status:{name:newStatus}}}});
+    toast('Estado atualizado no Notion','success');
+  } catch(e){ toast('Erro ao atualizar: '+e.message,'error'); r.status=cycle[(cycle.indexOf(newStatus)+2)%3]; render(); }
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────
+async function deleteRow(id) {
+  if (!confirm('Arquivar esta entrada no Notion?')) return;
+  try {
+    await notionReq('/v1/pages/'+id,'PATCH',{archived:true});
+    data = data.filter(x=>x.id!==id);
+    selected.delete(id); render();
+    toast('Entrada arquivada no Notion','success');
+  } catch(e){ toast('Erro: '+e.message,'error'); }
+}
+
+// ── Entry modal ────────────────────────────────────────────────────────────
+function buildTipoCheckboxes(selected=[]) {
+  document.getElementById('tipoCheckboxes').innerHTML = TIPOS.map(t => `
+    <label style="display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:12px;background:${selected.includes(t)?'var(--accent-l)':'var(--surface)'};color:${selected.includes(t)?'var(--accent-d)':'var(--text)'}">
+      <input type="checkbox" ${selected.includes(t)?'checked':''} value="${t}" onchange="updateTipoStyle(this)" style="height:auto;width:auto"> ${t}
+    </label>`).join('');
+}
+
+function updateTipoStyle(el){
+  el.parentElement.style.background = el.checked?'var(--accent-l)':'var(--surface)';
+  el.parentElement.style.color = el.checked?'var(--accent-d)':'var(--text)';
+}
+
+function getSelectedTipos(){ return [...document.querySelectorAll('#tipoCheckboxes input:checked')].map(x=>x.value); }
+
+function openAdd(){
+  editingId=null;
+  document.getElementById('entryTitle').textContent='Nova entrada';
+  document.getElementById('aCliente').value='';
+  document.getElementById('aStatus').value='Não iniciado';
+  document.getElementById('aN').value='';
+  buildTipoCheckboxes();
+  document.getElementById('aMes').value=activeMes;
+  document.getElementById('aPrazo').value='';
+  document.getElementById('aEmail').value='';
+  document.getElementById('entryModal').classList.add('open');
+  setTimeout(()=>document.getElementById('aCliente').focus(),100);
+}
+
+function openEdit(id){
+  editingId=id;
+  const r=data.find(x=>x.id===id);
+  document.getElementById('entryTitle').textContent='Editar entrada';
+  document.getElementById('aCliente').value=r.cliente;
+  document.getElementById('aStatus').value=r.status;
+  document.getElementById('aN').value=r.n||'';
+  buildTipoCheckboxes(r.tipo||[]);
+  document.getElementById('aMes').value=r.mes;
+  document.getElementById('aPrazo').value=r.prazo||'';
+  document.getElementById('aEmail').value=emailsMap[r.cliente]||'';
+  document.getElementById('entryModal').classList.add('open');
+}
+
+async function saveEntry(){
+  const cliente=document.getElementById('aCliente').value.trim();
+  if(!cliente){alert('Nome do cliente obrigatório.');return;}
+  const mes=document.getElementById('aMes').value;
+  const email=document.getElementById('aEmail').value.trim();
+  const tipos=getSelectedTipos();
+  const prazo=document.getElementById('aPrazo').value;
+
+  if(email) { emailsMap[cliente]=email; localStorage.setItem(EMAILS_KEY,JSON.stringify(emailsMap)); }
+
+  const props = {
+    'Cliente':{title:[{text:{content:cliente}}]},
+    'Status':{status:{name:document.getElementById('aStatus').value}},
+    'Tipo de tarefa':{multi_select:tipos.map(n=>({name:n}))},
+    'Selecionar':{select:{name:mes}},
+  };
+  const nv=document.getElementById('aN').value;
+  if(nv) props['Nº']={select:{name:nv}};
+  if(prazo) props['Prazo']={date:{start:prazo}};
+
+  const btn=document.getElementById('saveBtn');
+  btn.disabled=true; btn.textContent='A guardar…';
+  try {
+    let saved;
+    if(editingId){
+      saved = await notionReq('/v1/pages/'+editingId,'PATCH',{properties:props});
+      const i=data.findIndex(x=>x.id===editingId);
+      data[i]={...data[i],cliente,status:props['Status'].status.name,n:nv||null,tipo:tipos,mes,prazo:prazo||null};
+    } else {
+      saved = await notionReq('/v1/pages','POST',{parent:{database_id:DB_ID},properties:props});
+      data.push({id:saved.id,cliente,status:props['Status'].status.name,n:nv||null,tipo:tipos,mes,prazo:prazo||null,url:saved.url});
+    }
+    activeMes=mes;
+    closeModal('entryModal');
+    render();
+    toast('Guardado no Notion ✓','success');
+  } catch(e){ toast('Erro: '+e.message,'error'); }
+  finally{ btn.disabled=false; btn.textContent='Guardar no Notion'; }
+}
+
+// ── Duplicate ──────────────────────────────────────────────────────────────
+function openDup(mes){
+  document.getElementById('dupFrom').textContent=mes;
+  document.getElementById('dupMes').value=nextMonthStr(mes);
+  document.getElementById('dupPrazo').value='';
+  document.getElementById('dupModal').classList.add('open');
+  setTimeout(()=>document.getElementById('dupMes').focus(),100);
+}
+
+function openDupCurrent(){ openDup(activeMes); }
+function openDupSel(){
+  const rows=data.filter(r=>selected.has(r.id));
+  if(!rows.length) return;
+  const mes=rows[0].mes;
+  openDup(mes);
+}
+
+async function doDuplicate(){
+  const fromMes=document.getElementById('dupFrom').textContent;
+  const toMes=document.getElementById('dupMes').value.trim().toUpperCase();
+  const newPrazo=document.getElementById('dupPrazo').value||null;
+  if(!toMes){alert('Indique o mês de destino.');return;}
+
+  const source=data.filter(r=>r.mes===fromMes);
+  if(!source.length){toast('Sem entradas para duplicar','error');return;}
+
+  const btn=document.getElementById('dupBtn');
+  btn.disabled=true; btn.textContent='A duplicar…';
+
+  try {
+    let created=0;
+    for(const r of source){
+      const props={
+        'Cliente':{title:[{text:{content:r.cliente}}]},
+        'Status':{status:{name:'Não iniciado'}},
+        'Tipo de tarefa':{multi_select:(r.tipo||[]).map(n=>({name:n}))},
+        'Selecionar':{select:{name:toMes}},
+      };
+      if(r.n) props['Nº']={select:{name:r.n}};
+      const prazo=newPrazo||r.prazo;
+      if(prazo) props['Prazo']={date:{start:prazo}};
+      const saved=await notionReq('/v1/pages','POST',{parent:{database_id:DB_ID},properties:props});
+      data.push({id:saved.id,cliente:r.cliente,status:'Não iniciado',n:r.n,tipo:r.tipo,mes:toMes,prazo:prazo||null,url:saved.url});
+      created++;
+    }
+    activeMes=toMes;
+    closeModal('dupModal');
+    render();
+    toast(`${created} entradas duplicadas para ${toMes} no Notion ✓`,'success');
+  } catch(e){ toast('Erro: '+e.message,'error'); }
+  finally{ btn.disabled=false; btn.textContent='Duplicar no Notion →'; }
+}
+
+// ── Email ──────────────────────────────────────────────────────────────────
+function resetEmailModal(){
+  attachedFiles=[];
+  renderAttachList();
+  document.getElementById('fileInput').value='';
+  document.getElementById('attachNote').style.display='none';
+}
+
+function buildBody(rows){
+  const linhas=rows.map(r=>`  • ${r.cliente} — ${(r.tipo||[]).join(', ')}${r.prazo?' (prazo: '+new Date(r.prazo).toLocaleDateString('pt-PT')+')'  :''}`).join('\n');
+  return `Exmo(a). Senhor(a),\n\nVenho por este meio enviar a informação referente à(s) seguinte(s) prestação(ões):\n\n${linhas}\n\nCaso necessite de alguma informação adicional, não hesite em contactar.\n\nCom os melhores cumprimentos,`;
+}
+
+function openEmail(id){
+  const r=data.find(x=>x.id===id);
+  resetEmailModal();
+  document.getElementById('eTo').value=emailsMap[r.cliente]||'';
+  document.getElementById('eCc').value='';
+  document.getElementById('eSubj').value=`Prestação de contas — ${r.mes} — ${r.cliente}`;
+  document.getElementById('eBody').value=buildBody([r]);
+  document.getElementById('emailModal').classList.add('open');
+}
+
+function openEmailSel(){
+  const rows=data.filter(r=>selected.has(r.id));
+  if(!rows.length) return;
+  resetEmailModal();
+  const emails=[...new Set(rows.map(r=>emailsMap[r.cliente]).filter(Boolean))];
+  document.getElementById('eTo').value=emails.join(', ');
+  document.getElementById('eCc').value='';
+  document.getElementById('eSubj').value=`Prestações de contas — ${activeMes}`;
+  document.getElementById('eBody').value=buildBody(rows);
+  document.getElementById('emailModal').classList.add('open');
+}
+
+function doSendEmail(){
+  const to=document.getElementById('eTo').value;
+  const cc=document.getElementById('eCc').value;
+  const subj=encodeURIComponent(document.getElementById('eSubj').value);
+  const body=encodeURIComponent(document.getElementById('eBody').value);
+  let mailto=`mailto:${to}?subject=${subj}&body=${body}`;
+  if(cc) mailto+=`&cc=${encodeURIComponent(cc)}`;
+  window.open(mailto,'_blank');
+  if(attachedFiles.length) toast(`Email aberto — anexe os ${attachedFiles.length} ficheiro(s) manualmente`,'success');
+  else toast('Email aberto no cliente de correio','success');
+  closeModal('emailModal');
+  selected.clear(); render();
+}
+
+function copyEmailText(){
+  const text=`Para: ${document.getElementById('eTo').value}\nAssunto: ${document.getElementById('eSubj').value}\n\n${document.getElementById('eBody').value}`;
+  navigator.clipboard.writeText(text).then(()=>toast('Texto copiado ✓','success'));
+}
+
+function handleFiles(files){
+  [...files].forEach(f=>{ if(!attachedFiles.find(x=>x.name===f.name&&x.size===f.size)) attachedFiles.push(f); });
+  renderAttachList();
+  document.getElementById('attachNote').style.display=attachedFiles.length?'block':'none';
+}
+
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZone').style.borderColor='var(--border)';
+  document.getElementById('dropZone').style.background='';
+  handleFiles(e.dataTransfer.files);
+}
+
+function renderAttachList(){
+  const icons={pdf:'📄',xls:'📊',xlsx:'📊',doc:'📝',docx:'📝',jpg:'🖼',jpeg:'🖼',png:'🖼'};
+  document.getElementById('attachList').innerHTML=attachedFiles.map((f,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
+      <span style="font-size:12px;display:flex;align-items:center;gap:6px">
+        ${icons[f.name.split('.').pop().toLowerCase()]||'📎'} ${f.name}
+        <span style="color:var(--text3)">(${(f.size/1024).toFixed(0)} KB)</span>
+      </span>
+      <button class="btn btn-sm btn-icon btn-danger" onclick="attachedFiles.splice(${i},1);renderAttachList()" style="border:none">✕</button>
+    </div>`).join('');
+}
+
+// ── Sync indicator ─────────────────────────────────────────────────────────
+function setSyncing(v){
+  document.getElementById('syncDot').className='sync-dot'+(v?' syncing':'');
+  document.getElementById('syncLabel').textContent=v?'A sincronizar…':'Sincronizado';
+}
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.overlay.open').forEach(o=>o.classList.remove('open')); });
+
+let toastTimer;
+function toast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(type?' '+type:'');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+const savedToken = localStorage.getItem(TOKEN_KEY);
+if(savedToken){
+  token=savedToken;
+  emailsMap=JSON.parse(localStorage.getItem(EMAILS_KEY)||'{}');
+  showApp();
+  loadData();
+}
+</script>
+</body>
+</html>
