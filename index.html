@@ -134,16 +134,23 @@ td{padding:10px 14px;vertical-align:middle}
     <h1>📋 Prestações <span style="font-size:13px;font-weight:400;color:var(--text2)">× Notion</span></h1>
     <p>Para sincronizar com o seu Notion em qualquer PC, precisa de uma <strong>Integration Key</strong> (gratuita). É criada em 2 minutos e fica guardada no browser.</p>
     <div class="setup-steps">
-      <strong>Como criar a Integration Key:</strong><br>
+      <strong>Passo 1 — Criar o Worker (proxy gratuito):</strong><br>
+      1. Aceda a <a href="https://workers.cloudflare.com" target="_blank">workers.cloudflare.com</a> e crie conta gratuita<br>
+      2. Clique em <strong>"Create a Worker"</strong><br>
+      3. Apague o código de exemplo e cole o código do ficheiro <code>worker.js</code> que recebeu<br>
+      4. Clique <strong>"Deploy"</strong> e copie o URL do worker (ex: <code>xxx.workers.dev</code>)<br><br>
+      <strong>Passo 2 — Integration Key do Notion:</strong><br>
       1. Aceda a <a href="https://www.notion.so/profile/integrations" target="_blank">notion.so/profile/integrations</a><br>
-      2. Clique em <strong>"New integration"</strong><br>
-      3. Dê um nome (ex: "Prestações App") e clique <strong>Save</strong><br>
-      4. Copie o <strong>Internal Integration Secret</strong> (começa por <code>ntn_</code>)<br>
-      5. Cole abaixo e clique Ligar<br><br>
-      <strong>Importante:</strong> Na sua database PRESTAÇÕES no Notion, clique em <strong>⋯ → Connections → adicionar a integração</strong> que criou.
+      2. Clique em <strong>"New integration"</strong>, dê um nome e clique <strong>Save</strong><br>
+      3. Copie o <strong>Internal Integration Secret</strong> (começa por <code>ntn_</code>)<br>
+      4. Na database PRESTAÇÕES: clique em <strong>⋯ → Connections → adicionar a integração</strong>
     </div>
     <div class="field">
-      <label>Integration Key</label>
+      <label>Worker URL (do Cloudflare)</label>
+      <input type="text" id="workerInput" placeholder="https://xxx.workers.dev" style="width:100%;font-family:var(--mono)">
+    </div>
+    <div class="field">
+      <label>Integration Key (do Notion)</label>
       <input type="password" id="tokenInput" placeholder="ntn_xxxxxxxxxxxxxxxx" style="width:100%;font-family:var(--mono)">
     </div>
     <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="connectNotion()">
@@ -331,15 +338,13 @@ let emailsMap = {};
 
 // ── Proxy helper ───────────────────────────────────────────────────────────
 // Notion API blocks CORS from browsers, so we use a public CORS proxy
-const PROXIES = [
-  'https://corsproxy.io/?',
-  'https://api.codetabs.com/v1/proxy?quest=',
-  'https://thingproxy.freeboard.io/fetch/',
-];
+// WORKER_URL é preenchido automaticamente após criar o Cloudflare Worker
+let WORKER_URL = localStorage.getItem('prestacoes_worker_url') || '';
 
 async function notionReq(path, method='GET', body=null) {
+  if (!WORKER_URL) throw new Error('Worker URL não configurado');
   setSyncing(true);
-  const target = 'https://api.notion.com' + path;
+  const url = WORKER_URL.replace(/\/$/, '') + path;
   const opts = {
     method,
     headers: {
@@ -349,36 +354,40 @@ async function notionReq(path, method='GET', body=null) {
     }
   };
   if (body) opts.body = JSON.stringify(body);
-  let lastErr;
-  for (const proxy of PROXIES) {
-    try {
-      const res = await fetch(proxy + encodeURIComponent(target), opts);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Erro Notion API');
-      setSyncing(false);
-      return json;
-    } catch(e) { lastErr = e; }
+  try {
+    const res = await fetch(url, opts);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'Erro Notion API');
+    setSyncing(false);
+    return json;
+  } catch(e) {
+    setSyncing(false);
+    throw e;
   }
-  setSyncing(false);
-  throw lastErr;
 }
 
 // ── Setup ──────────────────────────────────────────────────────────────────
 async function connectNotion() {
   const t = document.getElementById('tokenInput').value.trim();
-  if (!t) return;
+  const w = document.getElementById('workerInput').value.trim();
+  if (!t || !w) { 
+    document.getElementById('setupError').style.display = 'block';
+    document.getElementById('setupError').textContent = 'Preencha o Worker URL e a Integration Key.';
+    return; 
+  }
   token = t;
+  WORKER_URL = w;
   try {
-    // test connection
     await notionReq('/v1/databases/' + DB_ID);
     localStorage.setItem(TOKEN_KEY, t);
+    localStorage.setItem('prestacoes_worker_url', w);
     emailsMap = JSON.parse(localStorage.getItem(EMAILS_KEY) || '{}');
     showApp();
     await loadData();
   } catch(e) {
     setSyncing(false);
     document.getElementById('setupError').style.display = 'block';
-    document.getElementById('setupError').textContent = 'Erro: ' + e.message + '. Verifique a key e se adicionou a integração à database no Notion.';
+    document.getElementById('setupError').textContent = 'Erro: ' + e.message + '. Verifique o Worker URL, a key e se adicionou a integração à database.';
   }
 }
 
@@ -799,11 +808,16 @@ function toast(msg,type=''){
 
 // ── Init ───────────────────────────────────────────────────────────────────
 const savedToken = localStorage.getItem(TOKEN_KEY);
-if(savedToken){
+const savedWorker = localStorage.getItem('prestacoes_worker_url');
+if(savedToken && savedWorker){
   token=savedToken;
+  WORKER_URL=savedWorker;
   emailsMap=JSON.parse(localStorage.getItem(EMAILS_KEY)||'{}');
   showApp();
   loadData();
+} else if(savedToken && !savedWorker) {
+  // show worker field pre-filled with token
+  document.getElementById('tokenInput').value = savedToken;
 }
 </script>
 </body>
