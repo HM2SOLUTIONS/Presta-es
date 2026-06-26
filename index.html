@@ -175,6 +175,8 @@ td{padding:10px 14px;vertical-align:middle}
         <button class="btn btn-sm" id="tabCliente" onclick="switchTab('cliente')" style="border:none;background:transparent">👤 Clientes</button>
         <button class="btn btn-sm" id="tabHistory" onclick="switchTab('history')" style="border:none;background:transparent">✉ Histórico</button>
         <button class="btn btn-sm" id="tabPrazos" onclick="switchTab('prazos')" style="border:none;background:transparent">📅 Prazos</button>
+        <button class="btn btn-sm" id="tabTrash" onclick="switchTab('trash')" style="border:none;background:transparent">🗑 Lixo <span id="trashCount" style="display:none;background:#fca5a5;color:#7f1d1d;border-radius:8px;padding:0 5px;font-size:10px"></span></button>
+        <button class="btn btn-sm" id="tabKanban" onclick="switchTab('kanban')" style="border:none;background:transparent">⬛ Kanban</button>
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn btn-sm" onclick="loadData()">↻</button>
@@ -206,8 +208,14 @@ td{padding:10px 14px;vertical-align:middle}
     <div class="sel-bar" id="selBar">
       ✓ <span id="selCount">0</span> selecionados
       <button class="btn btn-sm" onclick="clearSel()">Limpar</button>
+      <select id="bulkStatus" onchange="bulkChangeStatus(this.value)" style="height:28px;font-size:12px;border-radius:5px;padding:0 8px;border:1px solid var(--border)">
+        <option value="">Mudar estado para…</option>
+        <option value="Não iniciado">◎ Não iniciado</option>
+        <option value="Em andamento">↻ Em andamento</option>
+        <option value="Concluído">✓ Concluído</option>
+      </select>
       <button class="btn btn-sm btn-primary" onclick="openEmailSel()">✉ Enviar email</button>
-      <button class="btn btn-sm" onclick="openDupSel()">⧉ Duplicar para mês seguinte</button>
+      <button class="btn btn-sm" onclick="openDupSel()">⧉ Duplicar selecionados</button>
     </div>
 
     <div class="table-wrap">
@@ -247,6 +255,25 @@ td{padding:10px 14px;vertical-align:middle}
   <div id="tabPrazosView" style="display:none">
     <div id="prazosGrid"></div>
   </div>
+
+  <!-- Kanban view -->
+  <div id="tabKanbanView" style="display:none">
+    <div id="kanbanBoard" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start"></div>
+  </div>
+
+  <!-- Trash view -->
+  <div id="tabTrashView" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <span style="font-size:13px;color:var(--text2)">Tarefas eliminadas — pode recuperar ou apagar definitivamente</span>
+      <button class="btn btn-sm btn-danger" onclick="emptyTrash()">Esvaziar lixo</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Cliente</th><th>Tipo</th><th>Mês</th><th>Prazo</th><th>Eliminado em</th><th style="width:120px">Ações</th></tr></thead>
+        <tbody id="trashBody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Entry Modal -->
@@ -258,7 +285,11 @@ td{padding:10px 14px;vertical-align:middle}
     </div>
     <div class="modal-body">
       <div class="grid-2">
-        <div class="field span-2"><label>Cliente</label><input id="aCliente" type="text" placeholder="Nome do cliente"></div>
+        <div class="field span-2">
+          <label>Cliente</label>
+          <input id="aCliente" type="text" placeholder="Nome do cliente" autocomplete="off" oninput="showClienteSuggestions(this.value)" onblur="setTimeout(()=>document.getElementById('clienteSugg').style.display='none',200)">
+          <div id="clienteSugg" style="display:none;position:absolute;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:6px;box-shadow:var(--shadow-lg);max-height:160px;overflow-y:auto;width:calc(100% - 48px)"></div>
+        </div>
         <div class="field">
           <label>Estado</label>
           <select id="aStatus">
@@ -520,10 +551,10 @@ function renderStats() {
   const pend = rows.filter(r => r.status === 'Não iniciado').length;
   const late = rows.filter(r => r.prazo && new Date(r.prazo) < today && r.status !== 'Concluído').length;
   document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="stat-label">Total</div><div class="stat-val">${total}</div></div>
-    <div class="stat"><div class="stat-label">Concluídos</div><div class="stat-val green">${done}</div></div>
-    <div class="stat"><div class="stat-label">Pendentes</div><div class="stat-val yellow">${pend}</div></div>
-    <div class="stat"><div class="stat-label">Em atraso</div><div class="stat-val ${late>0?'red':''}">${late}</div></div>`;
+    <div class="stat" onclick="quickFilter('')" style="cursor:pointer" title="Ver todas"><div class="stat-label">Total</div><div class="stat-val">${total}</div></div>
+    <div class="stat" onclick="quickFilter('Concluído')" style="cursor:pointer" title="Ver concluídos"><div class="stat-label">Concluídos ↗</div><div class="stat-val green">${done}</div></div>
+    <div class="stat" onclick="quickFilter('Não iniciado')" style="cursor:pointer" title="Ver pendentes"><div class="stat-label">Pendentes ↗</div><div class="stat-val yellow">${pend}</div></div>
+    <div class="stat" onclick="quickFilterLate()" style="cursor:pointer" title="Ver em atraso"><div class="stat-label">Em atraso ↗</div><div class="stat-val ${late>0?'red':''}">${late}</div></div>`;
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
@@ -562,15 +593,24 @@ function render() {
       <tr>
         <td><input type="checkbox" ${selected.has(r.id)?'checked':''} onchange="toggleSel('${r.id}',this)"></td>
         <td style="font-weight:500">${r.cliente}</td>
-        <td><span onclick="cycleStatus('${r.id}')" title="Clique para mudar estado">${statusBadge(r.status)}</span></td>
+        <td>
+        <select onchange="changeStatusInline('${r.id}',this.value)" title="Mudar estado"
+          style="border:none;background:transparent;font-size:11px;font-weight:500;cursor:pointer;border-radius:20px;padding:3px 6px;
+          ${r.status==='Concluído'?'background:#ECFDF5;color:#0E7A4D':r.status==='Em andamento'?'background:#EBF0FD;color:#1340B0':'background:#FFFBEB;color:#92400E'}">
+          <option value="Não iniciado" ${r.status==='Não iniciado'?'selected':''}>◎ Não iniciado</option>
+          <option value="Em andamento" ${r.status==='Em andamento'?'selected':''}>↻ Em andamento</option>
+          <option value="Concluído" ${r.status==='Concluído'?'selected':''}>✓ Concluído</option>
+        </select>
+      </td>
         <td style="font-family:var(--mono);color:var(--text2)">${r.n||'—'}</td>
         <td>${(r.tipo||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
         <td>${prazoDisplay(r.prazo)}</td>
         <td><div style="display:flex;gap:4px">
           <button class="btn btn-sm btn-icon" onclick="openEmail('${r.id}')" title="Enviar email">✉</button>
           <button class="btn btn-sm btn-icon" onclick="openEdit('${r.id}')" title="Editar">✏</button>
+          <button class="btn btn-sm btn-icon" onclick="duplicateSingle('${r.id}')" title="Duplicar para mês seguinte">⧉</button>
           <a href="${r.url}" target="_blank" class="btn btn-sm btn-icon" title="Abrir no Notion">↗</a>
-          <button class="btn btn-sm btn-icon btn-danger" onclick="deleteRow('${r.id}')" title="Arquivar">✕</button>
+          <button class="btn btn-sm btn-icon btn-danger" onclick="deleteRow('${r.id}')" title="Mover para lixo">🗑</button>
         </div></td>
       </tr>`).join('');
   }
@@ -603,14 +643,87 @@ async function cycleStatus(id) {
 }
 
 // ── Delete ─────────────────────────────────────────────────────────────────
+const TRASH_KEY = 'prestacoes_trash';
+
+function loadTrash() {
+  return JSON.parse(localStorage.getItem(TRASH_KEY) || '[]');
+}
+function saveTrash(t) {
+  localStorage.setItem(TRASH_KEY, JSON.stringify(t));
+  updateTrashCount();
+}
+function updateTrashCount() {
+  const t = loadTrash();
+  const el = document.getElementById('trashCount');
+  if (t.length > 0) { el.style.display='inline'; el.textContent=t.length; }
+  else { el.style.display='none'; }
+}
+
 async function deleteRow(id) {
-  if (!confirm('Arquivar esta entrada no Notion?')) return;
+  if (!confirm('Mover para o lixo? Pode recuperar mais tarde.')) return;
   try {
     await notionReq('/v1/pages/'+id,'PATCH',{archived:true});
+    const r = data.find(x=>x.id===id);
+    if (r) {
+      const trash = loadTrash();
+      trash.unshift({...r, deletedAt: new Date().toISOString()});
+      saveTrash(trash);
+    }
     data = data.filter(x=>x.id!==id);
     selected.delete(id); render();
-    toast('Entrada arquivada no Notion','success');
+    toast('Movido para o lixo — pode recuperar no separador 🗑','success');
   } catch(e){ toast('Erro: '+e.message,'error'); }
+}
+
+async function restoreFromTrash(id) {
+  const trash = loadTrash();
+  const r = trash.find(x=>x.id===id);
+  if (!r) return;
+  try {
+    await notionReq('/v1/pages/'+id,'PATCH',{archived:false});
+    data.push({...r, deletedAt:undefined});
+    const newTrash = trash.filter(x=>x.id!==id);
+    saveTrash(newTrash);
+    renderTrash();
+    render();
+    toast('Tarefa recuperada com sucesso','success');
+  } catch(e){ toast('Erro ao recuperar: '+e.message,'error'); }
+}
+
+async function deleteFromTrash(id) {
+  if (!confirm('Apagar definitivamente? Esta ação não pode ser desfeita.')) return;
+  const trash = loadTrash();
+  saveTrash(trash.filter(x=>x.id!==id));
+  renderTrash();
+  toast('Apagado definitivamente','success');
+}
+
+function emptyTrash() {
+  if (!confirm('Esvaziar o lixo? Todas as entradas serão apagadas definitivamente.')) return;
+  saveTrash([]);
+  renderTrash();
+  toast('Lixo esvaziado','success');
+}
+
+function renderTrash() {
+  const trash = loadTrash();
+  const tbody = document.getElementById('trashBody');
+  if (!trash.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="empty-icon">🗑</div>O lixo está vazio</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = trash.map(r => `
+    <tr>
+      <td style="font-weight:500">${r.cliente}</td>
+      <td>${(r.tipo||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
+      <td style="font-family:var(--mono);font-size:12px">${r.mes||'—'}</td>
+      <td>${r.prazo ? new Date(r.prazo).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'}) : '—'}</td>
+      <td style="font-size:12px;color:var(--text2)">${r.deletedAt ? new Date(r.deletedAt).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-sm" onclick="restoreFromTrash('${r.id}')">↩ Recuperar</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteFromTrash('${r.id}')">✕</button>
+      </div></td>
+    </tr>`).join('');
 }
 
 // ── Entry modal ────────────────────────────────────────────────────────────
@@ -694,6 +807,28 @@ async function saveEntry(){
     toast('Guardado no Notion ✓','success');
   } catch(e){ toast('Erro: '+e.message,'error'); }
   finally{ btn.disabled=false; btn.textContent='Guardar no Notion'; }
+}
+
+// ── Duplicate single row ──────────────────────────────────────────────────────
+async function duplicateSingle(id) {
+  const r = data.find(x=>x.id===id);
+  if (!r) return;
+  const toMes = nextMonthStr(r.mes);
+  if (!confirm(`Duplicar "${r.cliente}" para ${toMes}?`)) return;
+  try {
+    const props = {
+      'Cliente':{title:[{text:{content:r.cliente}}]},
+      'Status':{status:{name:'Não iniciado'}},
+      'Tipo de tarefa':{multi_select:(r.tipo||[]).map(n=>({name:n}))},
+      'Selecionar':{select:{name:toMes}},
+    };
+    if (r.n) props['Nº'] = {select:{name:r.n}};
+    if (r.prazo) props['Prazo'] = {date:{start:r.prazo}};
+    const saved = await notionReq('/v1/pages','POST',{parent:{database_id:DB_ID},properties:props});
+    data.push({id:saved.id,cliente:r.cliente,status:'Não iniciado',n:r.n,tipo:r.tipo,mes:toMes,prazo:r.prazo||null,url:saved.url});
+    toast(`"${r.cliente}" duplicado para ${toMes} ✓`,'success');
+    render();
+  } catch(e){ toast('Erro: '+e.message,'error'); }
 }
 
 // ── Duplicate ──────────────────────────────────────────────────────────────
@@ -852,6 +987,62 @@ function toast(msg,type=''){
   toastTimer=setTimeout(()=>t.classList.remove('show'),3500);
 }
 
+// ── Quick filters ─────────────────────────────────────────────────────────────
+function quickFilter(status) {
+  switchTab('main');
+  document.getElementById('fStatus').value = status;
+  document.getElementById('fSearch').value = '';
+  render();
+  if (status) toast('A mostrar: ' + (status||'todas'), 'success');
+}
+
+function quickFilterLate() {
+  switchTab('main');
+  document.getElementById('fStatus').value = '';
+  document.getElementById('fSearch').value = '';
+  // filter late manually
+  const today = new Date();
+  const rows = data.filter(r => r.mes === activeMes && r.prazo && new Date(r.prazo) < today && r.status !== 'Concluído');
+  const tbody = document.getElementById('tbody');
+  if (!rows.length) { toast('Sem tarefas em atraso', 'success'); render(); return; }
+  tbody.innerHTML = rows.map(r => `
+    <tr style="background:var(--red-bg)">
+      <td><input type="checkbox" ${selected.has(r.id)?'checked':''} onchange="toggleSel('${r.id}',this)"></td>
+      <td style="font-weight:500">${r.cliente}</td>
+      <td><span onclick="cycleStatus('${r.id}')" style="cursor:pointer">${statusBadge(r.status)}</span></td>
+      <td style="font-family:var(--mono);color:var(--text2)">${r.n||'—'}</td>
+      <td>${(r.tipo||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
+      <td>${prazoDisplay(r.prazo)}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-sm btn-icon" onclick="openEmail('${r.id}')" title="Email">✉</button>
+        <button class="btn btn-sm btn-icon" onclick="openEdit('${r.id}')" title="Editar">✏</button>
+      </div></td>
+    </tr>`).join('');
+  toast(`${rows.length} tarefa(s) em atraso`, 'success');
+}
+
+// ── Bulk status ────────────────────────────────────────────────────────────────
+async function bulkChangeStatus(newStatus) {
+  if (!newStatus || !selected.size) { document.getElementById('bulkStatus').value=''; return; }
+  const ids = [...selected];
+  const confirm_msg = `Mudar ${ids.length} tarefa(s) para "${newStatus}"?`;
+  if (!confirm(confirm_msg)) { document.getElementById('bulkStatus').value=''; return; }
+  
+  let done = 0;
+  for (const id of ids) {
+    try {
+      await notionReq('/v1/pages/'+id,'PATCH',{properties:{Status:{status:{name:newStatus}}}});
+      const r = data.find(x=>x.id===id);
+      if (r) r.status = newStatus;
+      done++;
+    } catch(e) { console.error(e); }
+  }
+  document.getElementById('bulkStatus').value = '';
+  selected.clear();
+  render();
+  toast(`${done} tarefa(s) atualizadas para "${newStatus}"`, 'success');
+}
+
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 let currentTab = 'main';
 
@@ -867,47 +1058,79 @@ function switchTab(tab) {
   document.getElementById('tabClienteView').style.display = tab==='cliente' ? 'block' : 'none';
   document.getElementById('tabHistoryView').style.display = tab==='history' ? 'block' : 'none';
   document.getElementById('tabPrazosView').style.display = tab==='prazos' ? 'block' : 'none';
+  document.getElementById('tabTrashView').style.display = tab==='trash' ? 'block' : 'none';
+  document.getElementById('tabKanbanView').style.display = tab==='kanban' ? 'block' : 'none';
   const mainEls = ['stats','monthTabs','toolbar','selBar'];
   mainEls.forEach(id => { const el=document.getElementById(id); if(el) el.style.display = tab==='main' ? '' : 'none'; });
   document.querySelector('.table-wrap').style.display = tab==='main' ? '' : 'none';
   if (tab==='cliente') renderClienteView();
   if (tab==='history') renderHistory();
   if (tab==='prazos') renderPrazos();
+  if (tab==='trash') renderTrash();
+  if (tab==='kanban') renderKanban();
 }
 
 // ── Client view ────────────────────────────────────────────────────────────────
 function renderClienteView() {
   const clientes = [...new Set(data.map(r=>r.cliente))].sort();
   const today = new Date();
-  document.getElementById('clienteList').innerHTML = clientes.map(c => {
+  document.getElementById('clienteList').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:13px;color:var(--text2)">${clientes.length} cliente(s) · emails guardados localmente</div>
+    </div>` +
+  clientes.map(c => {
     const tasks = data.filter(r=>r.cliente===c);
     const done = tasks.filter(r=>r.status==='Concluído').length;
     const late = tasks.filter(r=>r.prazo&&new Date(r.prazo)<today&&r.status!=='Concluído').length;
     const pct = tasks.length ? Math.round(done/tasks.length*100) : 0;
     const email = emailsMap[c] || '';
-    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    const cid = c.replace(/[^a-zA-Z0-9]/g,'_');
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;box-shadow:var(--shadow)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:36px;height:36px;border-radius:50%;background:var(--accent-l);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:var(--accent)">${c.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
           <div>
             <div style="font-weight:600;font-size:15px">${c}</div>
-            <div style="font-size:12px;color:var(--text2)">${email||'Email não definido'} · ${tasks.length} tarefa${tasks.length!==1?'s':''}</div>
+            <div style="font-size:12px;color:var(--text2)">${tasks.length} tarefa${tasks.length!==1?'s':''} · ${[...new Set(tasks.map(r=>r.mes))].join(', ')}</div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px">
-          ${late>0?`<span style="font-size:11px;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:10px;font-weight:500">⚠ ${late} em atraso</span>`:''}
-          <span style="font-size:11px;background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:10px;font-weight:500">${pct}% concluído</span>
-          <button class="btn btn-sm" onclick="filterByCliente('${c.replace(/'/g,"\'")}')">Ver tarefas</button>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${late>0?`<span style="font-size:11px;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:10px;font-weight:500">⚠ ${late} atraso</span>`:''}
+          <span style="font-size:11px;background:${pct===100?'var(--green-bg)':'var(--accent-l)'};color:${pct===100?'var(--green)':'var(--accent-d)'};padding:2px 8px;border-radius:10px;font-weight:500">${pct}% concluído</span>
+          <button class="btn btn-sm" onclick="filterByCliente('${c.replace(/'/g,"\'")}')">Ver tarefas →</button>
         </div>
       </div>
-      <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${pct===100?'var(--green)':pct>50?'var(--accent)':'#D97706'};transition:width .3s"></div>
+      <div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;margin-bottom:10px">
+        <div style="height:100%;width:${pct}%;background:${pct===100?'var(--green)':pct>50?'var(--accent)':'#D97706'};transition:width .4s"></div>
       </div>
-      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
-        ${tasks.map(t=>`<span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);background:${t.status==='Concluído'?'var(--green-bg)':t.status==='Em andamento'?'var(--accent-l)':'var(--yellow-bg)'};color:${t.status==='Concluído'?'var(--green)':t.status==='Em andamento'?'var(--accent-d)':'var(--yellow)'}">${t.mes} · ${(t.tipo||[]).join(', ')||'—'}</span>`).join('')}
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text2);white-space:nowrap">✉ Email:</span>
+        <input id="email_${cid}" type="email" value="${email}" placeholder="adicionar email…" 
+          style="flex:1;min-width:180px;height:28px;font-size:12px;border:1px solid var(--border);border-radius:5px;padding:0 8px;background:var(--surface);color:var(--text)"
+          onkeydown="if(event.key==='Enter')saveClienteEmail('${c.replace(/'/g,"\'")}','${cid}')">
+        <button class="btn btn-sm" onclick="saveClienteEmail('${c.replace(/'/g,"\'")}','${cid}')">Guardar</button>
+        ${email?`<button class="btn btn-sm btn-primary" onclick="openEmailCliente('${c.replace(/'/g,"\'")}')">✉ Enviar email</button>`:''}
       </div>
     </div>`;
   }).join('') || '<div class="empty"><div class="empty-icon">👤</div>Sem clientes</div>';
+}
+
+function saveClienteEmail(nome, cid) {
+  const val = document.getElementById('email_'+cid).value.trim();
+  emailsMap[nome] = val;
+  localStorage.setItem(EMAILS_KEY, JSON.stringify(emailsMap));
+  toast('Email de ' + nome + ' guardado', 'success');
+  renderClienteView();
+}
+
+function openEmailCliente(nome) {
+  const rows = data.filter(r=>r.cliente===nome);
+  resetEmailModal();
+  document.getElementById('eTo').value = emailsMap[nome]||'';
+  document.getElementById('eCc').value = '';
+  document.getElementById('eSubj').value = `Prestações — ${nome}`;
+  document.getElementById('eBody').value = buildBody(rows);
+  document.getElementById('emailModal').classList.add('open');
 }
 
 function filterByCliente(nome) {
@@ -1002,6 +1225,133 @@ function addCustomTipo() {
   buildTipoCheckboxes([...currentSelected, val]);
 }
 
+// ── Inline status change ──────────────────────────────────────────────────────
+async function changeStatusInline(id, newStatus) {
+  const r = data.find(x=>x.id===id);
+  if (!r || r.status === newStatus) return;
+  const oldStatus = r.status;
+  r.status = newStatus;
+  render();
+  try {
+    await notionReq('/v1/pages/'+id,'PATCH',{properties:{Status:{status:{name:newStatus}}}});
+    toast(`${r.cliente} → ${newStatus}`,'success');
+  } catch(e) {
+    r.status = oldStatus;
+    render();
+    toast('Erro ao atualizar: '+e.message,'error');
+  }
+}
+
+// ── Kanban ─────────────────────────────────────────────────────────────────────
+let dragId = null;
+
+function renderKanban() {
+  const cols = [
+    {key:'Não iniciado', label:'◎ Não iniciado', bg:'#FFFBEB', border:'#FCD34D', text:'#92400E'},
+    {key:'Em andamento',  label:'↻ Em andamento',  bg:'#EBF0FD', border:'#93C5FD', text:'#1340B0'},
+    {key:'Concluído',     label:'✓ Concluído',     bg:'#ECFDF5', border:'#6EE7B7', text:'#0E7A4D'},
+  ];
+  const rows = data.filter(r=>r.mes===activeMes);
+  const board = document.getElementById('kanbanBoard');
+  board.innerHTML = cols.map(col => {
+    const cards = rows.filter(r=>r.status===col.key);
+    return `<div class="kanban-col" data-status="${col.key}"
+        style="background:var(--surface2);border-radius:10px;padding:12px;min-height:200px;border:2px dashed transparent;transition:border .15s"
+        ondragover="kanbanDragOver(event,this)"
+        ondragleave="this.style.borderColor='transparent'"
+        ondrop="kanbanDrop(event,'${col.key}')">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:12px;font-weight:600;color:${col.text};background:${col.bg};padding:3px 10px;border-radius:10px;border:1px solid ${col.border}">${col.label}</span>
+        <span style="font-size:11px;color:var(--text2);font-family:var(--mono)">${cards.length}</span>
+      </div>
+      ${cards.map(r => `
+        <div draggable="true"
+          ondragstart="kanbanDragStart(event,'${r.id}')"
+          ondragend="kanbanDragEnd(event)"
+          style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:grab;transition:box-shadow .15s;user-select:none"
+          onmouseenter="this.style.boxShadow='0 2px 8px rgba(0,0,0,.1)'"
+          onmouseleave="this.style.boxShadow=''">
+          <div style="font-weight:500;font-size:13px;margin-bottom:4px">${r.cliente}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">
+            ${(r.tipo||[]).map(t=>`<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);font-family:var(--mono)">${t}</span>`).join('')}
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:11px;color:var(--text2);font-family:var(--mono)">${r.mes}</span>
+            <div style="display:flex;gap:4px">
+              ${r.prazo?`<span style="font-size:10px;${new Date(r.prazo)<new Date()&&r.status!=='Concluído'?'color:var(--red);font-weight:500':'color:var(--text3)'}">${new Date(r.prazo).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})}</span>`:''}
+              <button onclick="duplicateSingle('${r.id}')" style="border:none;background:transparent;cursor:pointer;font-size:12px;color:var(--text3)" title="Duplicar">⧉</button>
+              <button onclick="openEmail('${r.id}')" style="border:none;background:transparent;cursor:pointer;font-size:12px;color:var(--text3)" title="Email">✉</button>
+            </div>
+          </div>
+        </div>`).join('')}
+      <button onclick="switchTab('main')" 
+        style="width:100%;margin-top:4px;border:1px dashed var(--border);border-radius:6px;padding:6px;font-size:12px;color:var(--text3);background:transparent;cursor:pointer"
+        onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'"
+        onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text3)'">
+        + Nova entrada
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function kanbanDragStart(e, id) {
+  dragId = id;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(()=>e.target.style.opacity='0.4', 0);
+}
+
+function kanbanDragEnd(e) {
+  e.target.style.opacity = '1';
+  document.querySelectorAll('.kanban-col').forEach(c=>c.style.borderColor='transparent');
+}
+
+function kanbanDragOver(e, col) {
+  e.preventDefault();
+  col.style.borderColor = 'var(--accent)';
+}
+
+async function kanbanDrop(e, newStatus) {
+  e.preventDefault();
+  document.querySelectorAll('.kanban-col').forEach(c=>c.style.borderColor='transparent');
+  if (!dragId) return;
+  const r = data.find(x=>x.id===dragId);
+  if (!r || r.status === newStatus) { dragId=null; return; }
+  const oldStatus = r.status;
+  r.status = newStatus;
+  renderKanban();
+  try {
+    await notionReq('/v1/pages/'+dragId,'PATCH',{properties:{Status:{status:{name:newStatus}}}});
+    toast(`${r.cliente} → ${newStatus}`,'success');
+  } catch(err) {
+    r.status = oldStatus;
+    renderKanban();
+    toast('Erro: '+err.message,'error');
+  }
+  dragId = null;
+}
+
+// ── Autocomplete cliente ──────────────────────────────────────────────────────
+function showClienteSuggestions(val) {
+  const sugg = document.getElementById('clienteSugg');
+  if (!val || val.length < 1) { sugg.style.display='none'; return; }
+  const matches = [...new Set(data.map(r=>r.cliente))].filter(c=>c.toLowerCase().includes(val.toLowerCase())).slice(0,6);
+  if (!matches.length) { sugg.style.display='none'; return; }
+  sugg.style.display='block';
+  sugg.innerHTML = matches.map(c=>`
+    <div onclick="selectCliente('${c.replace(/'/g,"\'")}','${c.replace(/'/g,"\'")}' )" 
+      style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--accent-l);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:var(--accent)">${c.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+      ${c}
+    </div>`).join('');
+}
+
+function selectCliente(nome) {
+  document.getElementById('aCliente').value = nome;
+  document.getElementById('clienteSugg').style.display = 'none';
+  if (emailsMap[nome]) document.getElementById('aEmail').value = emailsMap[nome];
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 const savedToken = localStorage.getItem(TOKEN_KEY);
 const savedWorker = localStorage.getItem('prestacoes_worker_url');
@@ -1010,9 +1360,9 @@ if(savedToken && savedWorker){
   WORKER_URL=savedWorker;
   emailsMap=JSON.parse(localStorage.getItem(EMAILS_KEY)||'{}');
   showApp();
+  updateTrashCount();
   loadData();
 } else if(savedToken && !savedWorker) {
-  // show worker field pre-filled with token
   document.getElementById('tokenInput').value = savedToken;
 }
 </script>
