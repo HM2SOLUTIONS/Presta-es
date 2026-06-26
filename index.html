@@ -170,9 +170,17 @@ td{padding:10px 14px;vertical-align:middle}
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <div class="sync-indicator"><div class="sync-dot" id="syncDot"></div><span id="syncLabel">Sincronizado</span></div>
-      <button class="btn btn-sm" onclick="loadData()">↻ Atualizar</button>
-      <button class="btn btn-sm" onclick="disconnect()" title="Desligar Notion" style="color:var(--text3)">Desligar</button>
-      <button class="btn btn-sm btn-primary" onclick="openAdd()">+ Nova entrada</button>
+      <div style="display:flex;gap:4px;background:var(--surface2);border-radius:6px;padding:3px">
+        <button class="btn btn-sm" id="tabMain" onclick="switchTab('main')" style="border:none;background:var(--accent);color:#fff">📋 Tarefas</button>
+        <button class="btn btn-sm" id="tabCliente" onclick="switchTab('cliente')" style="border:none;background:transparent">👤 Clientes</button>
+        <button class="btn btn-sm" id="tabHistory" onclick="switchTab('history')" style="border:none;background:transparent">✉ Histórico</button>
+        <button class="btn btn-sm" id="tabPrazos" onclick="switchTab('prazos')" style="border:none;background:transparent">📅 Prazos</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm" onclick="loadData()">↻</button>
+        <button class="btn btn-sm" onclick="disconnect()" style="color:var(--text3)">Desligar</button>
+        <button class="btn btn-sm btn-primary" onclick="openAdd()">+ Nova entrada</button>
+      </div>
     </div>
   </div>
 
@@ -219,6 +227,26 @@ td{padding:10px 14px;vertical-align:middle}
       </table>
     </div>
   </div>
+
+  <!-- Cliente view -->
+  <div id="tabClienteView" style="display:none">
+    <div id="clienteList"></div>
+  </div>
+
+  <!-- History view -->
+  <div id="tabHistoryView" style="display:none">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Para</th><th>Assunto</th><th>Clientes</th><th>Mês</th></tr></thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Prazos view -->
+  <div id="tabPrazosView" style="display:none">
+    <div id="prazosGrid"></div>
+  </div>
 </div>
 
 <!-- Entry Modal -->
@@ -255,6 +283,13 @@ td{padding:10px 14px;vertical-align:middle}
         </div>
         <div class="field"><label>Prazo</label><input id="aPrazo" type="date"></div>
         <div class="field span-2"><label>Email do cliente</label><input id="aEmail" type="email" placeholder="cliente@email.com"></div>
+        <div class="field span-2">
+          <label>Novo tipo de tarefa (opcional)</label>
+          <div style="display:flex;gap:8px">
+            <input id="aNovoTipo" type="text" placeholder="ex: IRS Empresas 2025" style="flex:1">
+            <button class="btn btn-sm" type="button" onclick="addCustomTipo()">+ Adicionar</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -322,10 +357,16 @@ td{padding:10px 14px;vertical-align:middle}
 <script>
 // ── Constants ──────────────────────────────────────────────────────────────
 const DB_ID = '29696dd2e40880a3b7afcc80a77b3de6';
-const TIPOS = ['SS ADV','IRC 2024','Prestação IRS 2024','OSS','IVA','DMR','RENT IRS'];
+const TIPOS_BASE = ['SS ADV','IRC 2024','IRC 2025','Prestação IRS 2024','Prestação IRS 2025','OSS','IVA','DMR','RENT IRS'];
+function getTipos() {
+  const custom = JSON.parse(localStorage.getItem(CUSTOM_TIPOS_KEY) || '[]');
+  return [...new Set([...TIPOS_BASE, ...custom])];
+}
 const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 const TOKEN_KEY = 'prestacoes_notion_token';
 const EMAILS_KEY = 'prestacoes_emails';
+const HISTORY_KEY = 'prestacoes_email_history';
+const CUSTOM_TIPOS_KEY = 'prestacoes_custom_tipos';
 
 // ── State ──────────────────────────────────────────────────────────────────
 let token = '';
@@ -574,7 +615,7 @@ async function deleteRow(id) {
 
 // ── Entry modal ────────────────────────────────────────────────────────────
 function buildTipoCheckboxes(selected=[]) {
-  document.getElementById('tipoCheckboxes').innerHTML = TIPOS.map(t => `
+  document.getElementById('tipoCheckboxes').innerHTML = getTipos().map(t => `
     <label style="display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:12px;background:${selected.includes(t)?'var(--accent-l)':'var(--surface)'};color:${selected.includes(t)?'var(--accent-d)':'var(--text)'}">
       <input type="checkbox" ${selected.includes(t)?'checked':''} value="${t}" onchange="updateTipoStyle(this)" style="height:auto;width:auto"> ${t}
     </label>`).join('');
@@ -746,11 +787,16 @@ function openEmailSel(){
 function doSendEmail(){
   const to=document.getElementById('eTo').value;
   const cc=document.getElementById('eCc').value;
-  const subj=encodeURIComponent(document.getElementById('eSubj').value);
+  const subjRaw=document.getElementById('eSubj').value;
+  const subj=encodeURIComponent(subjRaw);
   const body=encodeURIComponent(document.getElementById('eBody').value);
   let mailto=`mailto:${to}?subject=${subj}&body=${body}`;
   if(cc) mailto+=`&cc=${encodeURIComponent(cc)}`;
   window.open(mailto,'_blank');
+  // save to history
+  const rows = selected.size>0 ? data.filter(r=>selected.has(r.id)) : [];
+  const clientes = rows.length ? rows.map(r=>r.cliente) : [to];
+  saveEmailToHistory(to, subjRaw, clientes, activeMes);
   if(attachedFiles.length) toast(`Email aberto — anexe os ${attachedFiles.length} ficheiro(s) manualmente`,'success');
   else toast('Email aberto no cliente de correio','success');
   closeModal('emailModal');
@@ -806,7 +852,157 @@ function toast(msg,type=''){
   toastTimer=setTimeout(()=>t.classList.remove('show'),3500);
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+let currentTab = 'main';
+
+function switchTab(tab) {
+  currentTab = tab;
+  ['main','cliente','history','prazos'].forEach(t => {
+    const btn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+    const view = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1) + 'View');
+    const mainViews = ['stats','monthTabs','toolbar','selBar','.table-wrap'];
+    if (btn) { btn.style.background = t===tab ? 'var(--accent)' : 'transparent'; btn.style.color = t===tab ? '#fff' : 'var(--text)'; }
+  });
+  // show/hide views
+  document.getElementById('tabClienteView').style.display = tab==='cliente' ? 'block' : 'none';
+  document.getElementById('tabHistoryView').style.display = tab==='history' ? 'block' : 'none';
+  document.getElementById('tabPrazosView').style.display = tab==='prazos' ? 'block' : 'none';
+  const mainEls = ['stats','monthTabs','toolbar','selBar'];
+  mainEls.forEach(id => { const el=document.getElementById(id); if(el) el.style.display = tab==='main' ? '' : 'none'; });
+  document.querySelector('.table-wrap').style.display = tab==='main' ? '' : 'none';
+  if (tab==='cliente') renderClienteView();
+  if (tab==='history') renderHistory();
+  if (tab==='prazos') renderPrazos();
+}
+
+// ── Client view ────────────────────────────────────────────────────────────────
+function renderClienteView() {
+  const clientes = [...new Set(data.map(r=>r.cliente))].sort();
+  const today = new Date();
+  document.getElementById('clienteList').innerHTML = clientes.map(c => {
+    const tasks = data.filter(r=>r.cliente===c);
+    const done = tasks.filter(r=>r.status==='Concluído').length;
+    const late = tasks.filter(r=>r.prazo&&new Date(r.prazo)<today&&r.status!=='Concluído').length;
+    const pct = tasks.length ? Math.round(done/tasks.length*100) : 0;
+    const email = emailsMap[c] || '';
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--accent-l);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:var(--accent)">${c.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+          <div>
+            <div style="font-weight:600;font-size:15px">${c}</div>
+            <div style="font-size:12px;color:var(--text2)">${email||'Email não definido'} · ${tasks.length} tarefa${tasks.length!==1?'s':''}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${late>0?`<span style="font-size:11px;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:10px;font-weight:500">⚠ ${late} em atraso</span>`:''}
+          <span style="font-size:11px;background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:10px;font-weight:500">${pct}% concluído</span>
+          <button class="btn btn-sm" onclick="filterByCliente('${c.replace(/'/g,"\'")}')">Ver tarefas</button>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${pct===100?'var(--green)':pct>50?'var(--accent)':'#D97706'};transition:width .3s"></div>
+      </div>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
+        ${tasks.map(t=>`<span style="font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);background:${t.status==='Concluído'?'var(--green-bg)':t.status==='Em andamento'?'var(--accent-l)':'var(--yellow-bg)'};color:${t.status==='Concluído'?'var(--green)':t.status==='Em andamento'?'var(--accent-d)':'var(--yellow)'}">${t.mes} · ${(t.tipo||[]).join(', ')||'—'}</span>`).join('')}
+      </div>
+    </div>`;
+  }).join('') || '<div class="empty"><div class="empty-icon">👤</div>Sem clientes</div>';
+}
+
+function filterByCliente(nome) {
+  switchTab('main');
+  document.getElementById('fSearch').value = nome;
+  render();
+}
+
+// ── Email history ──────────────────────────────────────────────────────────────
+let emailHistory = [];
+
+function loadHistory() {
+  emailHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+}
+
+function saveEmailToHistory(to, subj, clientes, mes) {
+  loadHistory();
+  emailHistory.unshift({ date: new Date().toISOString(), to, subj, clientes, mes });
+  if (emailHistory.length > 100) emailHistory = emailHistory.slice(0, 100);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(emailHistory));
+}
+
+function renderHistory() {
+  loadHistory();
+  const tbody = document.getElementById('historyBody');
+  if (!emailHistory.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty"><div class="empty-icon">✉</div>Sem emails enviados ainda</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = emailHistory.map(h => `
+    <tr>
+      <td style="font-size:12px;color:var(--text2);white-space:nowrap">${new Date(h.date).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td>
+      <td style="font-size:13px">${h.to||'—'}</td>
+      <td style="font-size:13px">${h.subj||'—'}</td>
+      <td style="font-size:12px">${(h.clientes||[]).join(', ')}</td>
+      <td><span style="font-family:var(--mono);font-size:11px;background:var(--surface2);padding:2px 6px;border-radius:4px">${h.mes||'—'}</span></td>
+    </tr>`).join('');
+}
+
+// ── Prazos view ────────────────────────────────────────────────────────────────
+function renderPrazos() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  
+  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">`;
+  
+  for (let m = 0; m < 12; m++) {
+    const mesStr = monthNames[m].toUpperCase() + '/' + year;
+    const tasks = data.filter(r => r.mes === mesStr);
+    const done = tasks.filter(r => r.status === 'Concluído').length;
+    const late = tasks.filter(r => r.prazo && new Date(r.prazo) < today && r.status !== 'Concluído').length;
+    const pend = tasks.filter(r => r.status === 'Não iniciado').length;
+    const isCurrent = m === today.getMonth();
+    
+    html += `<div style="background:var(--surface);border:${isCurrent?'2px solid var(--accent)':'1px solid var(--border)'};border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-weight:600;font-family:var(--mono);font-size:13px;color:${isCurrent?'var(--accent)':'var(--text)'}">${mesStr}</span>
+        <div style="display:flex;gap:4px">
+          ${late>0?`<span style="font-size:10px;background:var(--red-bg);color:var(--red);padding:2px 6px;border-radius:8px">⚠ ${late}</span>`:''}
+          ${done>0?`<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:2px 6px;border-radius:8px">✓ ${done}</span>`:''}
+          ${pend>0?`<span style="font-size:10px;background:var(--yellow-bg);color:var(--yellow);padding:2px 6px;border-radius:8px">◎ ${pend}</span>`:''}
+        </div>
+      </div>
+      ${tasks.length === 0 
+        ? `<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">Sem tarefas</div>`
+        : tasks.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
+            <span style="font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.cliente}</span>
+            <span style="color:var(--text2);margin:0 6px">${(t.tipo||[]).join(', ')}</span>
+            ${t.prazo?`<span style="${new Date(t.prazo)<today&&t.status!=='Concluído'?'color:var(--red);font-weight:500':'color:var(--text3)'}">${new Date(t.prazo).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})}</span>`:''}
+          </div>`).join('')}
+      ${tasks.length>0?`<button class="btn btn-sm" style="width:100%;margin-top:8px;justify-content:center" onclick="switchTab('main');activeMes='${mesStr}';render()">Ver tarefas →</button>`:''}
+    </div>`;
+  }
+  html += '</div>';
+  document.getElementById('prazosGrid').innerHTML = html;
+}
+
+// ── Custom tipos ───────────────────────────────────────────────────────────────
+function addCustomTipo() {
+  const val = document.getElementById('aNovoTipo').value.trim();
+  if (!val) return;
+  const custom = JSON.parse(localStorage.getItem(CUSTOM_TIPOS_KEY) || '[]');
+  if (!custom.includes(val) && !TIPOS_BASE.includes(val)) {
+    custom.push(val);
+    localStorage.setItem(CUSTOM_TIPOS_KEY, JSON.stringify(custom));
+    toast('Tipo "' + val + '" adicionado', 'success');
+  }
+  document.getElementById('aNovoTipo').value = '';
+  // refresh checkboxes with new tipo selected
+  const currentSelected = getSelectedTipos();
+  buildTipoCheckboxes([...currentSelected, val]);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
 const savedToken = localStorage.getItem(TOKEN_KEY);
 const savedWorker = localStorage.getItem('prestacoes_worker_url');
 if(savedToken && savedWorker){
