@@ -123,6 +123,40 @@ td{padding:10px 14px;vertical-align:middle}
 .new-month-btn{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--text3);cursor:pointer;transition:all .15s;font-family:var(--mono)}
 .new-month-btn:hover{border-color:var(--accent);color:var(--accent)}
 
+/* #3 — Hover actions */
+.row-actions{display:flex;gap:4px;opacity:0;transition:opacity .12s}
+tbody tr:hover .row-actions{opacity:1}
+
+/* #4 — Badge clicável */
+.badge{cursor:pointer;transition:filter .1s}
+.badge:hover{filter:brightness(.9)}
+
+/* #5 — Barra de progresso no mês ativo */
+.month-pill-wrap{display:inline-flex;flex-direction:column;align-items:center;gap:2px}
+.month-progress{height:3px;border-radius:2px;background:rgba(255,255,255,.35);overflow:hidden;width:calc(100% - 12px);margin-bottom:2px}
+.month-progress:not(.active-p){background:var(--surface2)}
+.month-progress-bar{height:100%;border-radius:2px;transition:width .4s}
+
+/* #8 — Indicador a guardar na linha */
+@keyframes saving-pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.row-saving td{animation:saving-pulse .75s infinite}
+.row-saving td:first-child::before{content:'●';color:#D97706;font-size:9px;vertical-align:middle;margin-right:4px}
+
+/* #9 — Preview email */
+.email-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px}
+.email-tab{padding:7px 16px;font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--text2);transition:all .12s;background:none;border-top:none;border-left:none;border-right:none}
+.email-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.email-edit-pane{display:block}
+.email-preview-pane{display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:20px 24px;font-size:13px;line-height:1.75;white-space:pre-wrap;max-height:300px;overflow-y:auto;color:var(--text)}
+.email-preview-pane.show{display:block}
+
+/* #12 — Filtro tipo pills */
+.tipo-filter-bar{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;align-items:center;padding:0 2px}
+.tipo-pill{padding:3px 10px;border-radius:14px;font-size:11px;font-weight:500;font-family:var(--mono);border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;transition:all .12s;white-space:nowrap;line-height:1.8}
+.tipo-pill:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-l)}
+.tipo-pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tipo-filter-label{font-size:11px;color:var(--text3);white-space:nowrap;margin-right:2px}
+
 @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.search-wrap input{width:140px}.topbar{padding:0 16px}.main{padding:16px 16px 60px}}
 </style>
 </head>
@@ -179,7 +213,7 @@ td{padding:10px 14px;vertical-align:middle}
         <button class="btn btn-sm" id="tabKanban" onclick="switchTab('kanban')" style="border:none;background:transparent">⬛ Kanban</button>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-sm" onclick="loadData()">↻</button>
+        <button class="btn btn-sm" onclick="loadData(true)" title="Forçar sincronização com Notion">↻</button>
         <button class="btn btn-sm" onclick="disconnect()" style="color:var(--text3)">Desligar</button>
         <button class="btn btn-sm btn-primary" onclick="openAdd()">+ Nova entrada</button>
       </div>
@@ -193,7 +227,7 @@ td{padding:10px 14px;vertical-align:middle}
       <div class="toolbar-left">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input type="text" id="fSearch" placeholder="Pesquisar cliente…" oninput="render()">
+          <input type="text" id="fSearch" placeholder="Pesquisar cliente…" oninput="clearTimeout(window._st);window._st=setTimeout(render,160)">
         </div>
         <select id="fStatus" onchange="render()">
           <option value="">Todos os estados</option>
@@ -203,6 +237,12 @@ td{padding:10px 14px;vertical-align:middle}
         </select>
       </div>
       <button class="btn btn-sm" id="btnSendSel" style="display:none" onclick="openEmailSel()">✉ Enviar selecionados</button>
+    </div>
+
+    <!-- #12 Tipo filter pills -->
+    <div class="tipo-filter-bar" id="tipoFilterBar" style="display:none">
+      <span class="tipo-filter-label">Tipo:</span>
+      <span id="tipoFilterPills"></span>
     </div>
 
     <div class="sel-bar" id="selBar">
@@ -332,31 +372,53 @@ td{padding:10px 14px;vertical-align:middle}
 
 <!-- Email Modal -->
 <div class="overlay" id="emailModal">
-  <div class="modal" style="width:580px">
+  <div class="modal" style="width:600px">
     <div class="modal-header">
       <h2>✉ Enviar por email</h2>
       <button class="btn btn-sm btn-icon" onclick="closeModal('emailModal')">✕</button>
     </div>
     <div class="modal-body">
-      <div class="grid-2">
-        <div class="field"><label>Para</label><input id="eTo" type="email" placeholder="cliente@email.com"></div>
-        <div class="field"><label>CC (opcional)</label><input id="eCc" type="email"></div>
+      <!-- #9 Tabs editar / pré-visualizar -->
+      <div class="email-tabs">
+        <button class="email-tab active" id="tabEmailEdit" onclick="switchEmailTab('edit')">✏ Editar</button>
+        <button class="email-tab" id="tabEmailPreview" onclick="switchEmailTab('preview')">👁 Pré-visualizar</button>
       </div>
-      <div class="field"><label>Assunto</label><input id="eSubj" type="text"></div>
-      <div class="field"><label>Mensagem</label><textarea id="eBody"></textarea></div>
-      <div class="field">
-        <label>Anexos</label>
-        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
-          ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='var(--accent-l)'"
-          ondragleave="this.style.borderColor='var(--border)';this.style.background=''"
-          ondrop="handleDrop(event)">
-          📎 Clique ou arraste ficheiros para anexar
+
+      <!-- Painel Editar -->
+      <div id="emailEditPane" class="email-edit-pane">
+        <div class="grid-2">
+          <div class="field"><label>Para</label><input id="eTo" type="email" placeholder="cliente@email.com"></div>
+          <div class="field"><label>CC (opcional)</label><input id="eCc" type="email"></div>
         </div>
-        <input type="file" id="fileInput" multiple style="display:none" onchange="handleFiles(this.files)">
-        <div id="attachList" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
+        <div class="field"><label>Assunto</label><input id="eSubj" type="text"></div>
+        <div class="field"><label>Mensagem</label><textarea id="eBody" oninput="refreshEmailPreview()"></textarea></div>
+        <div class="field">
+          <label>Anexos</label>
+          <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+            ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='var(--accent-l)'"
+            ondragleave="this.style.borderColor='var(--border)';this.style.background=''"
+            ondrop="handleDrop(event)">
+            📎 Clique ou arraste ficheiros para anexar
+          </div>
+          <input type="file" id="fileInput" multiple style="display:none" onchange="handleFiles(this.files)">
+          <div id="attachList" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
+        </div>
+        <div id="attachNote" style="font-size:11px;color:var(--text3);margin-top:4px;display:none">
+          ℹ️ O cliente de email irá abrir com assunto e corpo preenchidos. Arraste os ficheiros listados para a janela do email.
+        </div>
       </div>
-      <div id="attachNote" style="font-size:11px;color:var(--text3);margin-top:4px;display:none">
-        ℹ️ O cliente de email irá abrir com assunto e corpo preenchidos. Arraste os ficheiros listados para a janela do email.
+
+      <!-- #9 Painel Pré-visualização -->
+      <div id="emailPreviewPane" class="email-preview-pane">
+        <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Para</div>
+          <div id="pvTo" style="font-size:13px;font-weight:500"></div>
+          <div id="pvCc" style="font-size:12px;color:var(--text2);margin-top:2px"></div>
+          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:10px;margin-bottom:3px">Assunto</div>
+          <div id="pvSubj" style="font-size:13px;font-weight:600"></div>
+        </div>
+        <div id="pvBody" style="font-size:13px;line-height:1.75;white-space:pre-wrap;color:var(--text)"></div>
+        <div id="pvAttach" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--text2)"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -398,6 +460,9 @@ const TOKEN_KEY = 'prestacoes_notion_token';
 const EMAILS_KEY = 'prestacoes_emails';
 const HISTORY_KEY = 'prestacoes_email_history';
 const CUSTOM_TIPOS_KEY = 'prestacoes_custom_tipos';
+const CACHE_KEY = 'prestacoes_data_cache';
+const CACHE_TIME_KEY = 'prestacoes_cache_time';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
 // ── State ──────────────────────────────────────────────────────────────────
 let token = '';
@@ -407,6 +472,7 @@ let selected = new Set();
 let editingId = null;
 let attachedFiles = [];
 let emailsMap = {};
+let activeTipoFilter = null; // #12 filtro por tipo
 
 // ── Proxy helper ───────────────────────────────────────────────────────────
 // Notion API blocks CORS from browsers, so we use a public CORS proxy
@@ -478,8 +544,48 @@ function disconnect() {
 }
 
 // ── Load data ──────────────────────────────────────────────────────────────
-async function loadData() {
+function saveCache(rows) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(rows));
+    localStorage.setItem(CACHE_TIME_KEY, Date.now().toString());
+  } catch(e) { /* quota exceeded — ignora */ }
+}
+
+function loadCache() {
+  try {
+    const ts = parseInt(localStorage.getItem(CACHE_TIME_KEY) || '0');
+    if (Date.now() - ts > CACHE_TTL) return null;
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function invalidateCache() {
+  localStorage.removeItem(CACHE_KEY);
+  localStorage.removeItem(CACHE_TIME_KEY);
+}
+
+async function loadData(forceRefresh = false) {
+  // Tenta cache primeiro (exceto se forçado)
+  if (!forceRefresh) {
+    const cached = loadCache();
+    if (cached) {
+      data = cached;
+      const months = getMonths();
+      if (!months.includes(activeMes) && months.length) activeMes = months[0];
+      render();
+      toast('Dados do cache local ⚡ — a verificar Notion…', '');
+      // Atualiza em background sem bloquear UI
+      fetchFromNotion(true);
+      return;
+    }
+  }
+  // Sem cache válido — carrega normalmente com loading
   document.getElementById('tbody').innerHTML = '<tr><td colspan="7"><div class="loading"><div class="spinner"></div> A carregar do Notion…</div></td></tr>';
+  await fetchFromNotion(false);
+}
+
+async function fetchFromNotion(silent = false) {
   try {
     let all = [], cursor = undefined;
     do {
@@ -490,7 +596,7 @@ async function loadData() {
       cursor = res.has_more ? res.next_cursor : undefined;
     } while(cursor);
 
-    data = all.map(p => ({
+    const newData = all.map(p => ({
       id: p.id,
       cliente: p.properties['Cliente']?.title?.[0]?.plain_text || '',
       status: p.properties['Status']?.status?.name || 'Não iniciado',
@@ -501,13 +607,18 @@ async function loadData() {
       url: p.url,
     }));
 
-    // Determine active month: prefer current month
+    data = newData;
+    saveCache(data);
+
     const months = getMonths();
     if (!months.includes(activeMes) && months.length) activeMes = months[0];
     render();
-    toast('Dados carregados do Notion', 'success');
+    if (!silent) toast('Dados carregados do Notion ✓', 'success');
+    else toast('Sincronizado com Notion ✓', 'success');
   } catch(e) {
-    document.getElementById('tbody').innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">⚠️</div>Erro ao carregar: ${e.message}</div></td></tr>`;
+    if (!silent) {
+      document.getElementById('tbody').innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">⚠️</div>Erro ao carregar: ${e.message}</div></td></tr>`;
+    }
     toast('Erro ao carregar: ' + e.message, 'error');
   }
 }
@@ -532,10 +643,22 @@ function nextMonthStr(mes) {
 function renderMonths() {
   const months = getMonths();
   document.getElementById('monthTabs').innerHTML = months.map(m => {
-    const count = data.filter(r => r.mes === m).length;
-    return `<div style="display:inline-flex;align-items:center;gap:2px">
-      <button class="month-pill ${m===activeMes?'active':''}" onclick="switchMonth('${m}')">${m}<span class="count">${count}</span></button>
-      <button style="height:24px;width:20px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-size:13px;border-radius:4px" title="Duplicar ${m}" onclick="openDup('${m}')" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⧉</button>
+    const rows = data.filter(r => r.mes === m);
+    const count = rows.length;
+    const done = rows.filter(r => r.status === 'Concluído').length;
+    const pct = count ? Math.round(done/count*100) : 0;
+    const isActive = m === activeMes;
+    // #5 — barra de progresso por baixo da pill
+    const barColor = pct===100 ? 'var(--green)' : pct>50 ? '#60A5FA' : '#FBBF24';
+    const progressBar = count ? `<div class="month-progress${isActive?' active-p':''}" style="width:calc(100% - 4px);margin:0 2px 3px">
+      <div class="month-progress-bar" style="width:${pct}%;background:${isActive?'rgba(255,255,255,.7)':barColor}"></div>
+    </div>` : '';
+    return `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:0">
+      <div style="display:inline-flex;align-items:center;gap:2px">
+        <button class="month-pill ${isActive?'active':''}" onclick="switchMonth('${m}')" title="${done}/${count} concluídos (${pct}%)">${m}<span class="count">${count}</span></button>
+        <button style="height:24px;width:20px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-size:13px;border-radius:4px;margin-bottom:3px" title="Duplicar ${m}" onclick="openDup('${m}')" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⧉</button>
+      </div>
+      ${progressBar}
     </div>`;
   }).join('') + `<button class="new-month-btn" onclick="openDupCurrent()">+ Mês seguinte</button>`;
 }
@@ -564,8 +687,34 @@ function filtered() {
   return data.filter(r =>
     r.mes === activeMes &&
     (!st || r.status === st) &&
-    (!q || r.cliente.toLowerCase().includes(q))
+    (!q || r.cliente.toLowerCase().includes(q) || (r.tipo||[]).some(t=>t.toLowerCase().includes(q))) &&
+    (!activeTipoFilter || (r.tipo||[]).includes(activeTipoFilter))
   );
+}
+
+// #12 — Tipo filter
+function renderTipoFilter() {
+  const rows = data.filter(r => r.mes === activeMes);
+  const tipos = [...new Set(rows.flatMap(r => r.tipo||[]))].sort();
+  const bar = document.getElementById('tipoFilterBar');
+  const pills = document.getElementById('tipoFilterPills');
+  if (!tipos.length) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  pills.innerHTML = tipos.map(t => `
+    <button class="tipo-pill ${activeTipoFilter===t?'active':''}" onclick="setTipoFilter('${t.replace(/'/g,"\'")}')">
+      ${t}<span style="margin-left:4px;font-size:10px;opacity:.7">${rows.filter(r=>(r.tipo||[]).includes(t)).length}</span>
+    </button>`).join('');
+  // Todos pill
+  const todosEl = document.createElement('button');
+  todosEl.className = 'tipo-pill' + (activeTipoFilter===null?' active':'');
+  todosEl.textContent = 'Todos';
+  todosEl.onclick = () => setTipoFilter(null);
+  pills.parentElement.insertBefore(todosEl, pills);
+}
+
+function setTipoFilter(tipo) {
+  activeTipoFilter = tipo;
+  render();
 }
 
 function prazoDisplay(p) {
@@ -586,37 +735,65 @@ function statusBadge(s) {
 
 function render() {
   const rows = filtered();
+  const q = document.getElementById('fSearch').value;
+  const st = document.getElementById('fStatus').value;
+  const hasFilter = q || st || activeTipoFilter;
+
   if (!rows.length) {
-    document.getElementById('tbody').innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><div>Sem entradas para este mês</div><div style="font-size:12px;margin-top:6px;color:var(--text3)">Use "+ Nova entrada" para adicionar</div></div></td></tr>`;
+    const msg = hasFilter
+      ? `<div class="empty"><div class="empty-icon">🔍</div><div>Sem resultados para o filtro ativo</div><button class="btn btn-sm" style="margin-top:12px" onclick="clearFilters()">Limpar filtros</button></div>`
+      : `<div class="empty"><div class="empty-icon">📋</div><div>Sem entradas para este mês</div><div style="font-size:12px;margin-top:6px;color:var(--text3)">Use "+ Nova entrada" para adicionar</div></div>`;
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="7">${msg}</td></tr>`;
   } else {
-    document.getElementById('tbody').innerHTML = rows.map(r => `
-      <tr>
+    document.getElementById('tbody').innerHTML = rows.map(r => {
+      // #4 — badge clicável para ciclar estado (sem select visível por omissão)
+      let badgeHtml;
+      if (r.status==='Concluído') badgeHtml=`<span class="badge badge-ok" onclick="cycleStatus('${r.id}')" title="Clique para mudar estado">✓ Concluído</span>`;
+      else if (r.status==='Em andamento') badgeHtml=`<span class="badge badge-em" onclick="cycleStatus('${r.id}')" title="Clique para mudar estado">↻ Em andamento</span>`;
+      else badgeHtml=`<span class="badge badge-ni" onclick="cycleStatus('${r.id}')" title="Clique para mudar estado">◎ Não iniciado</span>`;
+
+      // #12 — tags clicáveis para filtrar por tipo
+      const tipoTags = (r.tipo||[]).map(t=>`<span class="tag" style="cursor:pointer" onclick="setTipoFilter('${t.replace(/'/g,"\'")}');" title="Filtrar por ${t}">${t}</span>`).join('');
+
+      return `
+      <tr id="row-${r.id}">
         <td><input type="checkbox" ${selected.has(r.id)?'checked':''} onchange="toggleSel('${r.id}',this)"></td>
         <td style="font-weight:500">${r.cliente}</td>
-        <td>
-        <select onchange="changeStatusInline('${r.id}',this.value)" title="Mudar estado"
-          style="border:none;background:transparent;font-size:11px;font-weight:500;cursor:pointer;border-radius:20px;padding:3px 6px;
-          ${r.status==='Concluído'?'background:#ECFDF5;color:#0E7A4D':r.status==='Em andamento'?'background:#EBF0FD;color:#1340B0':'background:#FFFBEB;color:#92400E'}">
-          <option value="Não iniciado" ${r.status==='Não iniciado'?'selected':''}>◎ Não iniciado</option>
-          <option value="Em andamento" ${r.status==='Em andamento'?'selected':''}>↻ Em andamento</option>
-          <option value="Concluído" ${r.status==='Concluído'?'selected':''}>✓ Concluído</option>
-        </select>
-      </td>
+        <td>${badgeHtml}</td>
         <td style="font-family:var(--mono);color:var(--text2)">${r.n||'—'}</td>
-        <td>${(r.tipo||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
+        <td>${tipoTags}</td>
         <td>${prazoDisplay(r.prazo)}</td>
-        <td><div style="display:flex;gap:4px">
-          <button class="btn btn-sm btn-icon" onclick="openEmail('${r.id}')" title="Enviar email">✉</button>
-          <button class="btn btn-sm btn-icon" onclick="openEdit('${r.id}')" title="Editar">✏</button>
-          <button class="btn btn-sm btn-icon" onclick="duplicateSingle('${r.id}')" title="Duplicar para mês seguinte">⧉</button>
-          <a href="${r.url}" target="_blank" class="btn btn-sm btn-icon" title="Abrir no Notion">↗</a>
-          <button class="btn btn-sm btn-icon btn-danger" onclick="deleteRow('${r.id}')" title="Mover para lixo">🗑</button>
-        </div></td>
-      </tr>`).join('');
+        <td>
+          <div class="row-actions">
+            <button class="btn btn-sm btn-icon" onclick="openEmail('${r.id}')" title="Enviar email">✉</button>
+            <button class="btn btn-sm btn-icon" onclick="openEdit('${r.id}')" title="Editar">✏</button>
+            <button class="btn btn-sm btn-icon" onclick="duplicateSingle('${r.id}')" title="Duplicar para mês seguinte">⧉</button>
+            <a href="${r.url}" target="_blank" class="btn btn-sm btn-icon" title="Abrir no Notion">↗</a>
+            <button class="btn btn-sm btn-icon btn-danger" onclick="deleteRow('${r.id}')" title="Mover para lixo">🗑</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
   }
   renderStats();
   renderMonths();
+  renderTipoFilter();
   updateSelBar();
+}
+
+function clearFilters() {
+  document.getElementById('fSearch').value = '';
+  document.getElementById('fStatus').value = '';
+  activeTipoFilter = null;
+  render();
+}
+
+// #8 — Indicador a guardar/guardar linha
+function setRowSaving(id, saving) {
+  const el = document.getElementById('row-'+id);
+  if (!el) return;
+  if (saving) el.classList.add('row-saving');
+  else el.classList.remove('row-saving');
 }
 
 // ── Selection ──────────────────────────────────────────────────────────────
@@ -635,11 +812,19 @@ async function cycleStatus(id) {
   const r = data.find(x=>x.id===id);
   const cycle = ['Não iniciado','Em andamento','Concluído'];
   const newStatus = cycle[(cycle.indexOf(r.status)+1)%3];
-  r.status = newStatus; render();
+  const oldStatus = r.status;
+  r.status = newStatus;
+  render();
+  setRowSaving(id, true); // #8
   try {
     await notionReq('/v1/pages/'+id,'PATCH',{properties:{Status:{status:{name:newStatus}}}});
-    toast('Estado atualizado no Notion','success');
-  } catch(e){ toast('Erro ao atualizar: '+e.message,'error'); r.status=cycle[(cycle.indexOf(newStatus)+2)%3]; render(); }
+    setRowSaving(id, false);
+    toast(`${r.cliente} → ${newStatus}`,'success');
+  } catch(e){
+    setRowSaving(id, false);
+    toast('Erro ao atualizar: '+e.message,'error');
+    r.status = oldStatus; render();
+  }
 }
 
 // ── Delete ─────────────────────────────────────────────────────────────────
@@ -670,7 +855,9 @@ async function deleteRow(id) {
       saveTrash(trash);
     }
     data = data.filter(x=>x.id!==id);
-    selected.delete(id); render();
+    selected.delete(id);
+    invalidateCache();
+    render();
     toast('Movido para o lixo — pode recuperar no separador 🗑','success');
   } catch(e){ toast('Erro: '+e.message,'error'); }
 }
@@ -803,6 +990,7 @@ async function saveEntry(){
     }
     activeMes=mes;
     closeModal('entryModal');
+    invalidateCache();
     render();
     toast('Guardado no Notion ✓','success');
   } catch(e){ toast('Erro: '+e.message,'error'); }
@@ -826,6 +1014,7 @@ async function duplicateSingle(id) {
     if (r.prazo) props['Prazo'] = {date:{start:r.prazo}};
     const saved = await notionReq('/v1/pages','POST',{parent:{database_id:DB_ID},properties:props});
     data.push({id:saved.id,cliente:r.cliente,status:'Não iniciado',n:r.n,tipo:r.tipo,mes:toMes,prazo:r.prazo||null,url:saved.url});
+    invalidateCache();
     toast(`"${r.cliente}" duplicado para ${toMes} ✓`,'success');
     render();
   } catch(e){ toast('Erro: '+e.message,'error'); }
@@ -878,6 +1067,7 @@ async function doDuplicate(){
     }
     activeMes=toMes;
     closeModal('dupModal');
+    invalidateCache();
     render();
     toast(`${created} entradas duplicadas para ${toMes} no Notion ✓`,'success');
   } catch(e){ toast('Erro: '+e.message,'error'); }
@@ -890,6 +1080,44 @@ function resetEmailModal(){
   renderAttachList();
   document.getElementById('fileInput').value='';
   document.getElementById('attachNote').style.display='none';
+  switchEmailTab('edit'); // sempre começa em editar
+}
+
+// #9 — Preview email
+function switchEmailTab(tab) {
+  const editPane = document.getElementById('emailEditPane');
+  const previewPane = document.getElementById('emailPreviewPane');
+  const btnEdit = document.getElementById('tabEmailEdit');
+  const btnPreview = document.getElementById('tabEmailPreview');
+  if (tab === 'preview') {
+    refreshEmailPreview();
+    editPane.style.display = 'none';
+    previewPane.classList.add('show');
+    btnEdit.classList.remove('active');
+    btnPreview.classList.add('active');
+  } else {
+    editPane.style.display = 'block';
+    previewPane.classList.remove('show');
+    btnEdit.classList.add('active');
+    btnPreview.classList.remove('active');
+  }
+}
+
+function refreshEmailPreview() {
+  const to = document.getElementById('eTo').value;
+  const cc = document.getElementById('eCc').value;
+  const subj = document.getElementById('eSubj').value;
+  const body = document.getElementById('eBody').value;
+  document.getElementById('pvTo').textContent = to || '(sem destinatário)';
+  document.getElementById('pvCc').textContent = cc ? 'CC: ' + cc : '';
+  document.getElementById('pvCc').style.display = cc ? 'block' : 'none';
+  document.getElementById('pvSubj').textContent = subj;
+  document.getElementById('pvBody').textContent = body;
+  const hasAttach = attachedFiles.length > 0;
+  document.getElementById('pvAttach').textContent = hasAttach
+    ? '📎 ' + attachedFiles.map(f=>f.name).join(', ')
+    : '';
+  document.getElementById('pvAttach').style.display = hasAttach ? 'block' : 'none';
 }
 
 function buildBody(rows){
@@ -927,7 +1155,7 @@ function doSendEmail(){
   const body=encodeURIComponent(document.getElementById('eBody').value);
   let mailto=`mailto:${to}?subject=${subj}&body=${body}`;
   if(cc) mailto+=`&cc=${encodeURIComponent(cc)}`;
-  window.open(mailto,'_blank');
+  window.location.href = mailto;
   // save to history
   const rows = selected.size>0 ? data.filter(r=>selected.has(r.id)) : [];
   const clientes = rows.length ? rows.map(r=>r.cliente) : [to];
@@ -1232,10 +1460,13 @@ async function changeStatusInline(id, newStatus) {
   const oldStatus = r.status;
   r.status = newStatus;
   render();
+  setRowSaving(id, true); // #8
   try {
     await notionReq('/v1/pages/'+id,'PATCH',{properties:{Status:{status:{name:newStatus}}}});
+    setRowSaving(id, false);
     toast(`${r.cliente} → ${newStatus}`,'success');
   } catch(e) {
+    setRowSaving(id, false);
     r.status = oldStatus;
     render();
     toast('Erro ao atualizar: '+e.message,'error');
@@ -1362,6 +1593,10 @@ if(savedToken && savedWorker){
   showApp();
   updateTrashCount();
   loadData();
+  // Auto-sincroniza a cada 5 minutos quando a aba está visível
+  setInterval(() => {
+    if (document.visibilityState === 'visible') loadData(true);
+  }, 5 * 60 * 1000);
 } else if(savedToken && !savedWorker) {
   document.getElementById('tokenInput').value = savedToken;
 }
