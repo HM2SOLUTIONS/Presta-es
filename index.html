@@ -346,11 +346,7 @@ tbody tr:hover .row-actions{opacity:1}
         </div>
         <div class="field">
           <label>Mês (Selecionar)</label>
-          <select id="aMes">
-            <option>JAN/2026</option><option>FEV/2026</option><option>MAR/2026</option><option>ABR/2026</option>
-            <option>MAI/2026</option><option selected>JUN/2026</option><option>JUL/2026</option><option>AGO/2026</option>
-            <option>SET/2026</option><option>OUT/2026</option><option>NOV/2026</option><option>DEZ/2026</option>
-          </select>
+          <select id="aMes"></select>
         </div>
         <div class="field"><label>Prazo</label><input id="aPrazo" type="date"></div>
         <div class="field span-2"><label>Email do cliente</label><input id="aEmail" type="email" placeholder="cliente@email.com"></div>
@@ -435,7 +431,7 @@ tbody tr:hover .row-actions{opacity:1}
     <div class="modal-header"><h2>⧉ Duplicar mês</h2><button class="btn btn-sm btn-icon" onclick="closeModal('dupModal')">✕</button></div>
     <div class="modal-body">
       <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Copia as entradas de <strong id="dupFrom"></strong> para o mês seguinte, repondo o estado para "Não iniciado".</p>
-      <div class="field"><label>Mês de destino</label><input id="dupMes" type="text" placeholder="ex: JUL/2026" style="font-family:var(--mono)"></div>
+      <div class="field"><label>Mês de destino</label><select id="dupMes" style="font-family:var(--mono);width:100%"></select></div>
       <div class="field"><label>Novo prazo para todas (opcional)</label><input id="dupPrazo" type="date"></div>
     </div>
     <div class="modal-footer">
@@ -455,7 +451,31 @@ function getTipos() {
   const custom = JSON.parse(localStorage.getItem(CUSTOM_TIPOS_KEY) || '[]');
   return [...new Set([...TIPOS_BASE, ...custom])];
 }
-const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+const MESES = MESES_PT; // alias — definido dinamicamente acima
+
+// ── Geração dinâmica de opções de mês ─────────────────────────────────────
+function getMesOptions(selectedMes) {
+  // Gera 24 meses: 12 atrás + mês atual + 11 à frente
+  const hoje = new Date();
+  const opts = [];
+  for (let delta = -12; delta <= 11; delta++) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() + delta, 1);
+    const str = MESES_PT[d.getMonth()] + '/' + d.getFullYear();
+    opts.push(str);
+  }
+  // Garantir que o valor selecionado existe (pode ser de anos anteriores)
+  if (selectedMes && !opts.includes(selectedMes)) opts.unshift(selectedMes);
+  return opts;
+}
+
+function populateMesSelect(selectId, selectedMes) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const opts = getMesOptions(selectedMes || activeMes);
+  sel.innerHTML = opts.map(m =>
+    `<option value="${m}" ${m === (selectedMes || activeMes) ? 'selected' : ''}>${m}</option>`
+  ).join('');
+}
 const TOKEN_KEY = 'prestacoes_notion_token';
 const EMAILS_KEY = 'prestacoes_emails';
 const HISTORY_KEY = 'prestacoes_email_history';
@@ -467,7 +487,10 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 // ── State ──────────────────────────────────────────────────────────────────
 let token = '';
 let data = [];
-let activeMes = 'JUN/2026';
+// Calcular mês ativo a partir da data de hoje automaticamente
+const _hoje = new Date();
+const MESES_PT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+let activeMes = MESES_PT[_hoje.getMonth()] + '/' + _hoje.getFullYear();
 let selected = new Set();
 let editingId = null;
 let attachedFiles = [];
@@ -611,7 +634,10 @@ async function fetchFromNotion(silent = false) {
     saveCache(data);
 
     const months = getMonths();
-    if (!months.includes(activeMes) && months.length) activeMes = months[0];
+    // Se o mês atual (hoje) existe nos dados, vai para ele; senão fica no mais recente
+    const mesHoje = MESES_PT[new Date().getMonth()] + '/' + new Date().getFullYear();
+    if (months.includes(mesHoje)) activeMes = mesHoje;
+    else if (!months.includes(activeMes) && months.length) activeMes = months[0];
     render();
     if (!silent) toast('Dados carregados do Notion ✓', 'success');
     else toast('Sincronizado com Notion ✓', 'success');
@@ -700,16 +726,14 @@ function renderTipoFilter() {
   const pills = document.getElementById('tipoFilterPills');
   if (!tipos.length) { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
-  pills.innerHTML = tipos.map(t => `
-    <button class="tipo-pill ${activeTipoFilter===t?'active':''}" onclick="setTipoFilter('${t.replace(/'/g,"\'")}')">
-      ${t}<span style="margin-left:4px;font-size:10px;opacity:.7">${rows.filter(r=>(r.tipo||[]).includes(t)).length}</span>
-    </button>`).join('');
-  // Todos pill
-  const todosEl = document.createElement('button');
-  todosEl.className = 'tipo-pill' + (activeTipoFilter===null?' active':'');
-  todosEl.textContent = 'Todos';
-  todosEl.onclick = () => setTipoFilter(null);
-  pills.parentElement.insertBefore(todosEl, pills);
+  let html = '<button class="tipo-pill ' + (activeTipoFilter===null ? 'active' : '') + '" onclick="setTipoFilter(null)">Todos</button>';
+  tipos.forEach(t => {
+    const count = rows.filter(r => (r.tipo||[]).includes(t)).length;
+    const esc = t.replace(/'/g, "\'");
+    const active = activeTipoFilter === t ? 'active' : '';
+    html += '<button class="tipo-pill ' + active + '" onclick="setTipoFilter(\'' + esc + '\')">' + t + '<span style="margin-left:4px;font-size:10px;opacity:.7">' + count + '</span></button>';
+  });
+  pills.innerHTML = html;
 }
 
 function setTipoFilter(tipo) {
@@ -935,7 +959,7 @@ function openAdd(){
   document.getElementById('aStatus').value='Não iniciado';
   document.getElementById('aN').value='';
   buildTipoCheckboxes();
-  document.getElementById('aMes').value=activeMes;
+  populateMesSelect('aMes', activeMes);
   document.getElementById('aPrazo').value='';
   document.getElementById('aEmail').value='';
   document.getElementById('entryModal').classList.add('open');
@@ -950,7 +974,7 @@ function openEdit(id){
   document.getElementById('aStatus').value=r.status;
   document.getElementById('aN').value=r.n||'';
   buildTipoCheckboxes(r.tipo||[]);
-  document.getElementById('aMes').value=r.mes;
+  populateMesSelect('aMes', r.mes);
   document.getElementById('aPrazo').value=r.prazo||'';
   document.getElementById('aEmail').value=emailsMap[r.cliente]||'';
   document.getElementById('entryModal').classList.add('open');
@@ -1023,10 +1047,9 @@ async function duplicateSingle(id) {
 // ── Duplicate ──────────────────────────────────────────────────────────────
 function openDup(mes){
   document.getElementById('dupFrom').textContent=mes;
-  document.getElementById('dupMes').value=nextMonthStr(mes);
+  populateMesSelect('dupMes', nextMonthStr(mes));
   document.getElementById('dupPrazo').value='';
   document.getElementById('dupModal').classList.add('open');
-  setTimeout(()=>document.getElementById('dupMes').focus(),100);
 }
 
 function openDupCurrent(){ openDup(activeMes); }
@@ -1039,7 +1062,7 @@ function openDupSel(){
 
 async function doDuplicate(){
   const fromMes=document.getElementById('dupFrom').textContent;
-  const toMes=document.getElementById('dupMes').value.trim().toUpperCase();
+  const toMes=document.getElementById('dupMes').value.trim();
   const newPrazo=document.getElementById('dupPrazo').value||null;
   if(!toMes){alert('Indique o mês de destino.');return;}
 
@@ -1401,40 +1424,77 @@ function renderHistory() {
 // ── Prazos view ────────────────────────────────────────────────────────────────
 function renderPrazos() {
   const today = new Date();
-  const year = today.getFullYear();
-  const monthNames = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  
-  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">`;
-  
-  for (let m = 0; m < 12; m++) {
-    const mesStr = monthNames[m].toUpperCase() + '/' + year;
-    const tasks = data.filter(r => r.mes === mesStr);
-    const done = tasks.filter(r => r.status === 'Concluído').length;
-    const late = tasks.filter(r => r.prazo && new Date(r.prazo) < today && r.status !== 'Concluído').length;
-    const pend = tasks.filter(r => r.status === 'Não iniciado').length;
-    const isCurrent = m === today.getMonth();
-    
-    html += `<div style="background:var(--surface);border:${isCurrent?'2px solid var(--accent)':'1px solid var(--border)'};border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <span style="font-weight:600;font-family:var(--mono);font-size:13px;color:${isCurrent?'var(--accent)':'var(--text)'}">${mesStr}</span>
-        <div style="display:flex;gap:4px">
-          ${late>0?`<span style="font-size:10px;background:var(--red-bg);color:var(--red);padding:2px 6px;border-radius:8px">⚠ ${late}</span>`:''}
-          ${done>0?`<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:2px 6px;border-radius:8px">✓ ${done}</span>`:''}
-          ${pend>0?`<span style="font-size:10px;background:var(--yellow-bg);color:var(--yellow);padding:2px 6px;border-radius:8px">◎ ${pend}</span>`:''}
-        </div>
-      </div>
-      ${tasks.length === 0 
-        ? `<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">Sem tarefas</div>`
-        : tasks.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px">
-            <span style="font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.cliente}</span>
-            <span style="color:var(--text2);margin:0 6px">${(t.tipo||[]).join(', ')}</span>
-            ${t.prazo?`<span style="${new Date(t.prazo)<today&&t.status!=='Concluído'?'color:var(--red);font-weight:500':'color:var(--text3)'}">${new Date(t.prazo).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})}</span>`:''}
-          </div>`).join('')}
-      ${tasks.length>0?`<button class="btn btn-sm" style="width:100%;margin-top:8px;justify-content:center" onclick="switchTab('main');activeMes='${mesStr}';render()">Ver tarefas →</button>`:''}
-    </div>`;
+
+  // Recolher meses com dados + próximos 3 meses, ordenados
+  const mesesComDados = new Set(data.map(r => r.mes).filter(Boolean));
+  const mesesFuturos = [];
+  for (let d = 0; d <= 2; d++) {
+    const dt = new Date(today.getFullYear(), today.getMonth() + d, 1);
+    mesesFuturos.push(MESES_PT[dt.getMonth()] + '/' + dt.getFullYear());
   }
-  html += '</div>';
-  document.getElementById('prazosGrid').innerHTML = html;
+  mesesFuturos.forEach(m => mesesComDados.add(m));
+
+  // Ordenar cronologicamente
+  const toN = s => { const [mm, yy] = s.split('/'); return parseInt(yy)*100 + MESES_PT.indexOf(mm); };
+  const meses = [...mesesComDados].sort((a,b) => toN(a) - toN(b));
+
+  // Agrupar por ano
+  const byYear = {};
+  meses.forEach(m => {
+    const ano = m.split('/')[1];
+    if (!byYear[ano]) byYear[ano] = [];
+    byYear[ano].push(m);
+  });
+
+  let html = '';
+  Object.keys(byYear).sort().forEach(ano => {
+    html += `<div style="margin-bottom:24px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+        <span>${ano}</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px">`;
+
+    byYear[ano].forEach(mesStr => {
+      const tasks = data.filter(r => r.mes === mesStr);
+      const done = tasks.filter(r => r.status === 'Concluído').length;
+      const late = tasks.filter(r => r.prazo && new Date(r.prazo) < today && r.status !== 'Concluído').length;
+      const pend = tasks.filter(r => r.status === 'Não iniciado').length;
+      const pct = tasks.length ? Math.round(done/tasks.length*100) : 0;
+      const [mm] = mesStr.split('/');
+      const mIdx = MESES_PT.indexOf(mm);
+      const isCurrent = mIdx === today.getMonth() && parseInt(mesStr.split('/')[1]) === today.getFullYear();
+      const barColor = pct===100?'var(--green)':pct>50?'var(--accent)':'#D97706';
+
+      html += `<div style="background:var(--surface);border:${isCurrent?'2px solid var(--accent)':'1px solid var(--border)'};border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);transition:box-shadow .15s" onmouseenter="this.style.boxShadow='0 4px 12px rgba(0,0,0,.1)'" onmouseleave="this.style.boxShadow='var(--shadow)'">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-weight:700;font-family:var(--mono);font-size:13px;color:${isCurrent?'var(--accent)':'var(--text)'}">${mesStr}${isCurrent?' <span style="font-size:10px;background:var(--accent-l);color:var(--accent-d);padding:1px 6px;border-radius:8px;font-family:Inter,sans-serif;font-weight:500">atual</span>':''}</span>
+          <div style="display:flex;gap:3px">
+            ${late>0?`<span style="font-size:10px;background:var(--red-bg);color:var(--red);padding:2px 6px;border-radius:8px;font-weight:500">⚠ ${late}</span>`:''}
+            ${done>0?`<span style="font-size:10px;background:var(--green-bg);color:var(--green);padding:2px 6px;border-radius:8px">✓ ${done}</span>`:''}
+            ${pend>0?`<span style="font-size:10px;background:var(--yellow-bg);color:var(--yellow);padding:2px 6px;border-radius:8px">◎ ${pend}</span>`:''}
+          </div>
+        </div>
+        ${tasks.length > 0 ? `
+          <div style="background:var(--surface2);border-radius:3px;height:4px;margin-bottom:10px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:3px;transition:width .4s"></div>
+          </div>` : ''}
+        ${tasks.length === 0
+          ? `<div style="font-size:12px;color:var(--text3);text-align:center;padding:12px 0">Sem tarefas</div>`
+          : tasks.slice(0,5).map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">
+              <span style="font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px">${t.cliente}</span>
+              <span style="color:var(--text2);margin:0 4px;font-size:11px;font-family:var(--mono)">${(t.tipo||[]).slice(0,1).join('')}</span>
+              ${t.prazo?`<span style="font-size:11px;${new Date(t.prazo)<today&&t.status!=='Concluído'?'color:var(--red);font-weight:500':'color:var(--text3)'}">${new Date(t.prazo).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'})}</span>`:'<span style="color:var(--text3);font-size:11px">—</span>'}
+            </div>`).join('')}
+        ${tasks.length > 5 ? `<div style="font-size:11px;color:var(--text3);text-align:center;padding-top:4px">+${tasks.length-5} mais</div>` : ''}
+        ${tasks.length>0?`<button class="btn btn-sm" style="width:100%;margin-top:8px;justify-content:center" onclick="switchTab('main');activeMes='${mesStr}';render()">Ver tarefas →</button>`:''}
+      </div>`;
+    });
+
+    html += '</div></div>';
+  });
+
+  document.getElementById('prazosGrid').innerHTML = html || '<div class="empty"><div class="empty-icon">📅</div>Sem dados</div>';
 }
 
 // ── Custom tipos ───────────────────────────────────────────────────────────────
