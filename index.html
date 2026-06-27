@@ -122,6 +122,9 @@ td{padding:10px 14px;vertical-align:middle}
 
 .new-month-btn{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px dashed var(--border);background:transparent;color:var(--text3);cursor:pointer;transition:all .15s;font-family:var(--mono)}
 .new-month-btn:hover{border-color:var(--accent);color:var(--accent)}
+.nav-tab{height:30px;padding:0 12px;border-radius:6px;font-size:12px;font-weight:500;border:none;background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap;font-family:'Inter',sans-serif}
+.nav-tab:hover{background:var(--surface);color:var(--text)}
+.nav-tab.active{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
 
 @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}.search-wrap input{width:140px}.topbar{padding:0 16px}.main{padding:16px 16px 60px}}
 </style>
@@ -170,18 +173,19 @@ td{padding:10px 14px;vertical-align:middle}
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <div class="sync-indicator"><div class="sync-dot" id="syncDot"></div><span id="syncLabel">Sincronizado</span></div>
-      <div style="display:flex;gap:4px;background:var(--surface2);border-radius:6px;padding:3px">
-        <button class="btn btn-sm" id="tabMain" onclick="switchTab('main')" style="border:none;background:var(--accent);color:#fff">📋 Tarefas</button>
-        <button class="btn btn-sm" id="tabCliente" onclick="switchTab('cliente')" style="border:none;background:transparent">👤 Clientes</button>
-        <button class="btn btn-sm" id="tabHistory" onclick="switchTab('history')" style="border:none;background:transparent">✉ Histórico</button>
-        <button class="btn btn-sm" id="tabPrazos" onclick="switchTab('prazos')" style="border:none;background:transparent">📅 Prazos</button>
-        <button class="btn btn-sm" id="tabTrash" onclick="switchTab('trash')" style="border:none;background:transparent">🗑 Lixo <span id="trashCount" style="display:none;background:#fca5a5;color:#7f1d1d;border-radius:8px;padding:0 5px;font-size:10px"></span></button>
-        <button class="btn btn-sm" id="tabKanban" onclick="switchTab('kanban')" style="border:none;background:transparent">⬛ Kanban</button>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-sm" onclick="loadData()">↻</button>
-        <button class="btn btn-sm" onclick="disconnect()" style="color:var(--text3)">Desligar</button>
-        <button class="btn btn-sm btn-primary" onclick="openAdd()">+ Nova entrada</button>
+      <nav style="display:flex;gap:2px;background:var(--surface2);border-radius:8px;padding:3px">
+        <button class="nav-tab active" id="tabMain" onclick="switchTab('main')" title="Lista de tarefas">📋 Tarefas</button>
+        <button class="nav-tab" id="tabKanban" onclick="switchTab('kanban')" title="Vista Kanban">⬛ Kanban</button>
+        <button class="nav-tab" id="tabPrazos" onclick="switchTab('prazos')" title="Calendário anual">📅 Prazos</button>
+        <button class="nav-tab" id="tabCliente" onclick="switchTab('cliente')" title="Gerir clientes">👤 Clientes</button>
+        <button class="nav-tab" id="tabHistory" onclick="switchTab('history')" title="Emails enviados">✉ Emails</button>
+        <button class="nav-tab" id="tabTrash" onclick="switchTab('trash')" title="Lixo">🗑 <span id="trashCount" style="display:none;background:#fca5a5;color:#7f1d1d;border-radius:8px;padding:0 5px;font-size:10px;font-weight:600"></span></button>
+      </nav>
+      <div style="display:flex;gap:6px;align-items:center">
+        <div class="sync-indicator" style="margin-right:4px" title="Estado de sincronização"><div class="sync-dot" id="syncDot"></div><span id="syncLabel" style="font-size:11px;color:var(--text3)"></span></div>
+        <button class="btn btn-sm" onclick="loadData()" title="Atualizar dados">↻</button>
+        <button class="btn btn-sm" onclick="disconnect()" style="color:var(--text3)" title="Desligar">✕</button>
+        <button class="btn btn-sm btn-primary" onclick="openAdd()">+ Nova</button>
       </div>
     </div>
   </div>
@@ -207,16 +211,19 @@ td{padding:10px 14px;vertical-align:middle}
       <div class="toolbar-left">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input type="text" id="fSearch" placeholder="Pesquisar cliente…" oninput="render()">
+          <input type="text" id="fSearch" placeholder="Pesquisar…" oninput="render()">
         </div>
         <select id="fStatus" onchange="render()">
           <option value="">Todos os estados</option>
-          <option value="Não iniciado">Não iniciado</option>
-          <option value="Em andamento">Em andamento</option>
-          <option value="Concluído">Concluído</option>
+          <option value="Não iniciado">◎ Pendente</option>
+          <option value="Em andamento">↻ Em andamento</option>
+          <option value="Concluído">✓ Concluído</option>
         </select>
       </div>
-      <button class="btn btn-sm" id="btnSendSel" style="display:none" onclick="openEmailSel()">✉ Enviar selecionados</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span id="filteredCount" style="font-size:12px;color:var(--text3)"></span>
+        <button class="btn btn-sm" id="btnSendSel" style="display:none" onclick="openEmailSel()">✉ Enviar</button>
+      </div>
     </div>
 
     <div class="sel-bar" id="selBar">
@@ -272,6 +279,13 @@ td{padding:10px 14px;vertical-align:middle}
 
   <!-- Kanban view -->
   <div id="tabKanbanView" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;color:var(--text2);font-weight:500">Mês:</span>
+        <div id="kanbanMonthTabs" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+      </div>
+      <div style="font-size:12px;color:var(--text3)" id="kanbanSummary"></div>
+    </div>
     <div id="kanbanBoard" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;align-items:start"></div>
   </div>
 
@@ -649,6 +663,8 @@ function render() {
   renderMonths();
   renderProgressBar();
   updateSelBar();
+  const fc = document.getElementById('filteredCount');
+  if (fc) fc.textContent = rows.length !== data.filter(r=>r.mes===activeMes).length ? `${rows.length} resultados` : '';
 }
 
 // ── Selection ──────────────────────────────────────────────────────────────
@@ -1087,12 +1103,9 @@ let currentTab = 'main';
 
 function switchTab(tab) {
   currentTab = tab;
-  ['main','cliente','history','prazos'].forEach(t => {
-    const btn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
-    const view = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1) + 'View');
-    const mainViews = ['stats','monthTabs','toolbar','selBar','.table-wrap'];
-    if (btn) { btn.style.background = t===tab ? 'var(--accent)' : 'transparent'; btn.style.color = t===tab ? '#fff' : 'var(--text)'; }
-  });
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+  if (activeBtn) activeBtn.classList.add('active');
   // show/hide views
   document.getElementById('tabClienteView').style.display = tab==='cliente' ? 'block' : 'none';
   document.getElementById('tabHistoryView').style.display = tab==='history' ? 'block' : 'none';
@@ -1362,14 +1375,29 @@ async function changeStatusInline(id, newStatus) {
 
 // ── Kanban ─────────────────────────────────────────────────────────────────────
 let dragId = null;
+let kanbanMes = null;
+
+function renderKanbanMonthTabs() {
+  const months = getMonths();
+  if (!kanbanMes || !months.includes(kanbanMes)) kanbanMes = activeMes || months[0];
+  document.getElementById('kanbanMonthTabs').innerHTML = months.map(m => `
+    <button onclick="kanbanMes='${m}';renderKanban()" 
+      style="padding:3px 10px;border-radius:14px;font-size:11px;font-weight:500;font-family:var(--mono);border:1px solid ${m===kanbanMes?'var(--accent)':'var(--border)'};background:${m===kanbanMes?'var(--accent)':'var(--surface)'};color:${m===kanbanMes?'#fff':'var(--text2)'};cursor:pointer">
+      ${m}
+    </button>`).join('');
+}
 
 function renderKanban() {
+  renderKanbanMonthTabs();
   const cols = [
     {key:'Não iniciado', label:'◎ Não iniciado', bg:'#FFFBEB', border:'#FCD34D', text:'#92400E'},
     {key:'Em andamento',  label:'↻ Em andamento',  bg:'#EBF0FD', border:'#93C5FD', text:'#1340B0'},
     {key:'Concluído',     label:'✓ Concluído',     bg:'#ECFDF5', border:'#6EE7B7', text:'#0E7A4D'},
   ];
-  const rows = data.filter(r=>r.mes===activeMes);
+  const rows = data.filter(r=>r.mes===(kanbanMes||activeMes));
+  const total = rows.length;
+  const done = rows.filter(r=>r.status==='Concluído').length;
+  document.getElementById('kanbanSummary').textContent = total ? `${done}/${total} concluídas · ${Math.round(done/total*100)}%` : '';
   const board = document.getElementById('kanbanBoard');
   board.innerHTML = cols.map(col => {
     const cards = rows.filter(r=>r.status===col.key);
@@ -1437,12 +1465,15 @@ async function kanbanDrop(e, newStatus) {
   const oldStatus = r.status;
   r.status = newStatus;
   renderKanban();
+  renderProgressBar();
   try {
     await notionReq('/v1/pages/'+dragId,'PATCH',{properties:{Status:{status:{name:newStatus}}}});
+    logActivity(dragId, r.cliente, 'Estado alterado via Kanban', `${oldStatus} → ${newStatus}`);
     toast(`${r.cliente} → ${newStatus}`,'success');
   } catch(err) {
     r.status = oldStatus;
     renderKanban();
+    renderProgressBar();
     toast('Erro: '+err.message,'error');
   }
   dragId = null;
