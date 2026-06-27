@@ -252,9 +252,66 @@ td.td-cliente { font-weight:600; font-size:14px; }
 .spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg) } }
 
-/* ── New month btn ── */
 .new-month-btn { padding:5px 14px; border-radius:20px; font-size:12px; font-weight:500; border:1px dashed var(--border); background:transparent; color:var(--text3); cursor:pointer; transition:all var(--transition); font-family:var(--mono); }
 .new-month-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* ── Row hover actions ── */
+.row-actions { display:flex; gap:3px; opacity:0; transition:opacity var(--transition); }
+tbody tr:hover .row-actions { opacity:1; }
+
+/* ── Badge clickable ── */
+.badge { cursor:pointer; transition:filter var(--transition); }
+.badge:hover { filter:brightness(.92); }
+
+/* ── Tipo filter pills ── */
+.tipo-bar { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; align-items:center; }
+.tipo-pill { padding:3px 10px; border-radius:14px; font-size:11px; font-weight:600; font-family:var(--mono); border:1px solid var(--border); background:var(--surface); color:var(--text2); cursor:pointer; transition:all var(--transition); white-space:nowrap; display:inline-flex; align-items:center; gap:4px; }
+.tipo-pill:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-l); }
+.tipo-pill.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+
+/* ── Row saving pulse ── */
+@keyframes saving { 0%,100%{opacity:1}50%{opacity:.3} }
+.row-saving td { animation:saving .75s infinite; }
+.row-saving td:first-child::before { content:'●'; color:#D97706; font-size:9px; vertical-align:middle; margin-right:4px; }
+
+/* ── Email tabs ── */
+.email-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:16px; }
+.email-tab { padding:7px 16px; font-size:12.5px; font-weight:500; cursor:pointer; border:none; background:none; color:var(--text2); border-bottom:2px solid transparent; transition:all var(--transition); font-family:'Inter',sans-serif; }
+.email-tab:hover { color:var(--text); }
+.email-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.email-preview-pane { display:none; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:18px; font-size:13px; line-height:1.75; white-space:pre-wrap; max-height:290px; overflow-y:auto; color:var(--text); }
+.email-preview-pane.show { display:block; }
+
+/* ── Month progress bar (under pill) ── */
+.month-pill-wrap { display:inline-flex; flex-direction:column; align-items:center; }
+.mprog { height:3px; width:calc(100% - 4px); background:var(--surface3); border-radius:2px; overflow:hidden; margin-bottom:2px; }
+.mprog-fill { height:100%; border-radius:2px; transition:width .4s; }
+
+/* ── Confirm modal ── */
+.confirm-box { background:var(--surface); border-radius:14px; padding:28px 26px 20px; width:380px; max-width:calc(100vw - 40px); box-shadow:var(--shadow-lg); }
+.confirm-box h3 { font-size:16px; font-weight:700; margin-bottom:8px; }
+.confirm-box p { font-size:13px; color:var(--text2); line-height:1.6; margin-bottom:20px; }
+.confirm-actions { display:flex; gap:8px; justify-content:flex-end; }
+
+/* ── Client avatar ── */
+.client-avatar { width:38px; height:38px; border-radius:50%; background:var(--accent-l); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; color:var(--accent); flex-shrink:0; }
+
+/* ── Dup progress ── */
+#dupProgress { margin-top:14px; }
+.dup-prog-track { background:var(--surface2); border-radius:99px; height:6px; overflow:hidden; margin-top:6px; }
+.dup-prog-fill { height:100%; background:var(--accent); border-radius:99px; transition:width .3s; }
+
+/* ── Search box upgrade ── */
+.search-wrap input { border-width:1.5px; }
+.search-wrap input:focus { box-shadow:0 0 0 3px rgba(79,110,247,.1); }
+
+/* ── Btn ghost ── */
+.btn-ghost { border-color:transparent; background:transparent; color:var(--text2); }
+.btn-ghost:hover { background:var(--surface2); border-color:var(--border); color:var(--text); }
+
+/* ── Resend button in history ── */
+.hist-resend { opacity:0; transition:opacity var(--transition); }
+tr:hover .hist-resend { opacity:1; }
 
 @media(max-width:640px){
   .stats{grid-template-columns:repeat(2,1fr)}
@@ -337,7 +394,7 @@ td.td-cliente { font-weight:600; font-size:14px; }
       </nav>
       <div style="display:flex;gap:6px;align-items:center">
         <div class="sync-indicator" title="Sincronização Notion"><div class="sync-dot" id="syncDot"></div><span id="syncLabel" style="font-size:11px;color:var(--text3)"></span></div>
-        <button class="btn btn-sm" onclick="loadData()" title="Atualizar">
+        <button class="btn btn-sm" onclick="loadData(true)" title="Atualizar">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
         </button>
         <button class="btn btn-sm" onclick="disconnect()" style="color:var(--text3)" title="Desligar">
@@ -374,10 +431,16 @@ td.td-cliente { font-weight:600; font-size:14px; }
       </div>
       <div id="monthTabs" style="display:flex;align-items:center;flex:1;overflow-x:auto;scrollbar-width:none;padding:0 4px"></div>
     </div>
+    <!-- Tipo filter bar -->
+    <div class="tipo-bar" id="tipoBar" style="display:none">
+      <span style="font-size:11px;color:var(--text3);flex-shrink:0">Tipo:</span>
+      <div id="tipoPills"></div>
+    </div>
+
     <div class="toolbar">
       <div class="search-wrap">
         <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="fSearch" placeholder="Pesquisar cliente…" oninput="render()">
+        <input type="text" id="fSearch" placeholder="Pesquisar cliente…" oninput="clearTimeout(window._st);window._st=setTimeout(render,150)">
       </div>
       <select id="fStatus" onchange="render()" style="height:36px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;padding:0 10px;background:var(--surface);color:var(--text);font-family:'Inter',sans-serif;outline:none">
         <option value="">Todos os estados</option>
@@ -465,7 +528,7 @@ td.td-cliente { font-weight:600; font-size:14px; }
   <div id="tabHistoryView" style="display:none">
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Data</th><th>Para</th><th>Assunto</th><th>Clientes</th><th>Mês</th></tr></thead>
+        <thead><tr><th>Data</th><th>Para</th><th>Assunto</th><th>Clientes</th><th>Mês</th><th style="width:90px"></th></tr></thead>
         <tbody id="historyBody"></tbody>
       </table>
     </div>
@@ -575,11 +638,7 @@ td.td-cliente { font-weight:600; font-size:14px; }
         </div>
         <div class="field">
           <label>Mês (Selecionar)</label>
-          <select id="aMes">
-            <option>JAN/2026</option><option>FEV/2026</option><option>MAR/2026</option><option>ABR/2026</option>
-            <option>MAI/2026</option><option selected>JUN/2026</option><option>JUL/2026</option><option>AGO/2026</option>
-            <option>SET/2026</option><option>OUT/2026</option><option>NOV/2026</option><option>DEZ/2026</option>
-          </select>
+          <select id="aMes" style="font-family:var(--mono)"></select>
         </div>
         <div class="field"><label>Prazo</label><input id="aPrazo" type="date"></div>
         <div class="field span-2"><label>Email do cliente</label><input id="aEmail" type="email" placeholder="cliente@email.com"></div>
@@ -607,25 +666,42 @@ td.td-cliente { font-weight:600; font-size:14px; }
       <button class="btn btn-sm btn-icon" onclick="closeModal('emailModal')">✕</button>
     </div>
     <div class="modal-body">
-      <div class="grid-2">
-        <div class="field"><label>Para</label><input id="eTo" type="email" placeholder="cliente@email.com"></div>
-        <div class="field"><label>CC (opcional)</label><input id="eCc" type="email"></div>
+      <div class="email-tabs">
+        <button class="email-tab active" id="etabEdit" onclick="switchEmailTab('edit')">✏ Editar</button>
+        <button class="email-tab" id="etabPreview" onclick="switchEmailTab('preview')">👁 Pré-visualizar</button>
       </div>
-      <div class="field"><label>Assunto</label><input id="eSubj" type="text"></div>
-      <div class="field"><label>Mensagem</label><textarea id="eBody"></textarea></div>
-      <div class="field">
-        <label>Anexos</label>
-        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
-          ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='var(--accent-l)'"
-          ondragleave="this.style.borderColor='var(--border)';this.style.background=''"
-          ondrop="handleDrop(event)">
-          📎 Clique ou arraste ficheiros para anexar
+      <div id="emailEditPane">
+        <div class="grid-2">
+          <div class="field"><label>Para</label><input id="eTo" type="email" placeholder="cliente@email.com" oninput="refreshEmailPreview()"></div>
+          <div class="field"><label>CC (opcional)</label><input id="eCc" type="email" oninput="refreshEmailPreview()"></div>
         </div>
-        <input type="file" id="fileInput" multiple style="display:none" onchange="handleFiles(this.files)">
-        <div id="attachList" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
+        <div class="field"><label>Assunto</label><input id="eSubj" type="text" oninput="refreshEmailPreview()"></div>
+        <div class="field"><label>Mensagem</label><textarea id="eBody" oninput="refreshEmailPreview()"></textarea></div>
+        <div class="field">
+          <label>Anexos</label>
+          <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
+            ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='var(--accent-l)'"
+            ondragleave="this.style.borderColor='var(--border)';this.style.background=''"
+            ondrop="handleDrop(event)">
+            📎 Clique ou arraste ficheiros para anexar
+          </div>
+          <input type="file" id="fileInput" multiple style="display:none" onchange="handleFiles(this.files)">
+          <div id="attachList" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
+        </div>
+        <div id="attachNote" style="font-size:11px;color:var(--text3);margin-top:4px;display:none;padding:8px;background:var(--surface2);border-radius:6px">
+          ℹ️ O cliente de email abrirá com assunto e corpo preenchidos. Arraste os ficheiros para a janela do email.
+        </div>
       </div>
-      <div id="attachNote" style="font-size:11px;color:var(--text3);margin-top:4px;display:none">
-        ℹ️ O cliente de email irá abrir com assunto e corpo preenchidos. Arraste os ficheiros listados para a janela do email.
+      <div id="emailPreviewPane" class="email-preview-pane">
+        <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:3px">Para</div>
+          <div id="pvTo" style="font-size:13px;font-weight:500"></div>
+          <div id="pvCc" style="font-size:12px;color:var(--text2);margin-top:2px;display:none"></div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-top:10px;margin-bottom:3px">Assunto</div>
+          <div id="pvSubj" style="font-size:13px;font-weight:600"></div>
+        </div>
+        <div id="pvBody" style="font-size:13px;line-height:1.75;white-space:pre-wrap"></div>
+        <div id="pvAttach" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--text2);display:none"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -642,12 +718,29 @@ td.td-cliente { font-weight:600; font-size:14px; }
     <div class="modal-header"><h2>⧉ Duplicar mês</h2><button class="btn btn-sm btn-icon" onclick="closeModal('dupModal')">✕</button></div>
     <div class="modal-body">
       <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Copia as entradas de <strong id="dupFrom"></strong> para o mês seguinte, repondo o estado para "Não iniciado".</p>
-      <div class="field"><label>Mês de destino</label><input id="dupMes" type="text" placeholder="ex: JUL/2026" style="font-family:var(--mono)"></div>
+      <div class="field"><label>Mês de destino</label><select id="dupMes" style="font-family:var(--mono)"></select></div>
       <div class="field"><label>Novo prazo para todas (opcional)</label><input id="dupPrazo" type="date"></div>
+      <div id="dupProgress" style="display:none;margin-top:12px">
+        <div style="font-size:12px;color:var(--text2);margin-bottom:6px" id="dupProgressLabel">A duplicar…</div>
+        <div class="dup-prog-track"><div class="dup-prog-fill" id="dupProgressBar" style="width:0%"></div></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('dupModal')">Cancelar</button>
       <button class="btn btn-primary" id="dupBtn" onclick="doDuplicate()">Duplicar no Notion →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div style="font-size:26px;margin-bottom:10px" id="confirmIcon">⚠️</div>
+    <h3 id="confirmTitle">Tem a certeza?</h3>
+    <p id="confirmMsg"></p>
+    <div class="confirm-actions">
+      <button class="btn" onclick="closeConfirm()">Cancelar</button>
+      <button class="btn btn-primary" id="confirmOkBtn">Confirmar</button>
     </div>
   </div>
 </div>
@@ -667,15 +760,37 @@ const TOKEN_KEY = 'prestacoes_notion_token';
 const EMAILS_KEY = 'prestacoes_emails';
 const HISTORY_KEY = 'prestacoes_email_history';
 const CUSTOM_TIPOS_KEY = 'prestacoes_custom_tipos';
+const CACHE_KEY = 'prestacoes_cache';
+const CACHE_TS_KEY = 'prestacoes_cache_ts';
+const CACHE_TTL = 5 * 60 * 1000;
 
 // ── State ──────────────────────────────────────────────────────────────────
 let token = '';
 let data = [];
-let activeMes = 'JUN/2026';
+const _todayInit = new Date();
+const MESES_PT = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+let activeMes = MESES_PT[_todayInit.getMonth()] + '/' + _todayInit.getFullYear();
+let activeTipo = null;
 let selected = new Set();
 let editingId = null;
 let attachedFiles = [];
 let emailsMap = {};
+
+// ── Cache ──────────────────────────────────────────────────────────────────
+function saveCache(d) { try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); localStorage.setItem(CACHE_TS_KEY, Date.now()); } catch(e){} }
+function loadCache() { try { const ts=+localStorage.getItem(CACHE_TS_KEY)||0; if(Date.now()-ts>CACHE_TTL)return null; const r=localStorage.getItem(CACHE_KEY); return r?JSON.parse(r):null; } catch(e){return null;} }
+function invalidateCache() { localStorage.removeItem(CACHE_KEY); localStorage.removeItem(CACHE_TS_KEY); }
+
+// ── Confirm dialog ─────────────────────────────────────────────────────────
+function confirmAction(title, msg, btnLabel, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  const btn = document.getElementById('confirmOkBtn');
+  btn.textContent = btnLabel;
+  btn.onclick = () => { closeConfirm(); if(typeof cb==='function') cb(); else if(typeof cb==='string') eval(cb); };
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+function closeConfirm() { document.getElementById('confirmOverlay').classList.remove('open'); }
 
 // ── Proxy helper ───────────────────────────────────────────────────────────
 // Notion API blocks CORS from browsers, so we use a public CORS proxy
@@ -747,10 +862,25 @@ function disconnect() {
 }
 
 // ── Load data ──────────────────────────────────────────────────────────────
-async function loadData() {
-  document.getElementById('tbody').innerHTML = '<tr><td colspan="7"><div class="loading"><div class="spinner"></div> A carregar do Notion…</div></td></tr>';
+async function loadData(forceRefresh = false) {
+  if (!forceRefresh) {
+    const cached = loadCache();
+    if (cached) {
+      data = cached;
+      normalizeActiveMes();
+      render();
+      toast('Cache local ⚡ — a verificar Notion…', '');
+      fetchFromNotion(true);
+      return;
+    }
+  }
+  document.getElementById('tbody').innerHTML = '<tr><td colspan="7"><div class="loading"><div class="spinner"></div>A carregar do Notion…</div></td></tr>';
+  await fetchFromNotion(false);
+}
+
+async function fetchFromNotion(silent = false) {
   try {
-    let all = [], cursor = undefined;
+    let all = [], cursor;
     do {
       const body = { page_size: 100 };
       if (cursor) body.start_cursor = cursor;
@@ -758,7 +888,6 @@ async function loadData() {
       all = all.concat(res.results);
       cursor = res.has_more ? res.next_cursor : undefined;
     } while(cursor);
-
     data = all.map(p => ({
       id: p.id,
       cliente: p.properties['Cliente']?.title?.[0]?.plain_text || '',
@@ -769,18 +898,24 @@ async function loadData() {
       prazo: p.properties['Prazo']?.date?.start || null,
       url: p.url,
     }));
-
-    // Determine active month: prefer current month
-    const months = getMonths();
-    if (!months.includes(activeMes) && months.length) activeMes = months[0];
-    syncClientsFromData();
+    saveCache(data);
+    normalizeActiveMes();
     render();
-    toast('Dados carregados do Notion', 'success');
+    if (!silent) toast('Dados carregados ✓', 'success');
+    else toast('Sincronizado ✓', 'success');
   } catch(e) {
-    document.getElementById('tbody').innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">⚠️</div>Erro ao carregar: ${e.message}</div></td></tr>`;
-    toast('Erro ao carregar: ' + e.message, 'error');
+    if (!silent) document.getElementById('tbody').innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">⚠️</div>Erro: ${e.message}</div></td></tr>`;
+    toast('Erro: ' + e.message, 'error');
   }
 }
+
+function normalizeActiveMes() {
+  const months = getMonths();
+  const mesHoje = MESES_PT[new Date().getMonth()] + '/' + new Date().getFullYear();
+  if (months.includes(mesHoje)) activeMes = mesHoje;
+  else if (!months.includes(activeMes) && months.length) activeMes = months[0];
+}
+
 
 // ── Months ─────────────────────────────────────────────────────────────────
 function getMonths() {
@@ -799,27 +934,45 @@ function nextMonthStr(mes) {
   return MESES[i+1] + '/' + yy;
 }
 
+function getMesOptions(sel) {
+  const opts = []; const now = new Date();
+  for (let d=-12;d<=11;d++){const dt=new Date(now.getFullYear(),now.getMonth()+d,1);opts.push(MESES[dt.getMonth()]+'/'+dt.getFullYear());}
+  if (sel && !opts.includes(sel)) opts.unshift(sel);
+  return opts;
+}
+function populateMesSelect(id, sel) {
+  const el=document.getElementById(id); if(!el)return;
+  el.innerHTML=getMesOptions(sel).map(m=>`<option value="${m}"${m===sel?' selected':''}>${m}</option>`).join('');
+}
+
+
 function renderMonths() {
   const months = getMonths();
-  // update big label
   const lbl = document.getElementById('activeMonthBig');
   if (lbl) lbl.textContent = activeMes;
   document.getElementById('monthTabs').innerHTML = months.map(m => {
-    const count = data.filter(r => r.mes === m).length;
-    const done = data.filter(r => r.mes === m && r.status === 'Concluído').length;
-    const late = data.filter(r => r.mes === m && r.prazo && new Date(r.prazo) < new Date() && r.status !== 'Concluído').length;
-    return `<div style="display:inline-flex;align-items:center;position:relative">
-      <button class="month-pill-new ${m===activeMes?'active':''}" onclick="switchMonth('${m}')">
-        ${m}
-        <span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:8px;background:${m===activeMes?'var(--accent)':'var(--surface2)'};color:${m===activeMes?'#fff':'var(--text2)'}">${done}/${count}</span>
-        ${late>0?`<span style="font-size:10px;background:var(--red-bg);color:var(--red);padding:1px 5px;border-radius:8px;font-weight:700">⚠${late}</span>`:''}
-      </button>
-      <button onclick="openDup('${m}')" title="Duplicar ${m}" style="width:18px;height:18px;border:none;background:transparent;cursor:pointer;color:var(--text3);font-size:12px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:3px" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⧉</button>
+    const rows = data.filter(r => r.mes === m);
+    const done = rows.filter(r => r.status==='Concluído').length;
+    const late = rows.filter(r => r.prazo && new Date(r.prazo)<new Date() && r.status!=='Concluído').length;
+    const pct = rows.length ? Math.round(done/rows.length*100) : 0;
+    const isA = m === activeMes;
+    const barColor = pct===100?'var(--green)':pct>50?'var(--accent)':'#D97706';
+    return `<div class="month-pill-wrap">
+      <div style="display:inline-flex;align-items:center">
+        <button class="month-pill-new ${isA?'active':''}" onclick="switchMonth('${m}')" title="${done}/${rows.length} concluídos">
+          ${m}
+          <span class="count-badge">${done}/${rows.length}</span>
+          ${late>0?`<span style="font-size:10px;background:var(--red-bg);color:var(--red);border-radius:6px;padding:1px 5px;font-weight:700">⚠${late}</span>`:''}
+        </button>
+        <button style="height:20px;width:18px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-size:12px;border-radius:4px;display:flex;align-items:center;justify-content:center;align-self:center;margin-left:1px" title="Duplicar ${m}" onclick="openDup('${m}')" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text3)'">⧉</button>
+      </div>
+      ${rows.length?`<div class="mprog"><div class="mprog-fill" style="width:${pct}%;background:${isA?'var(--accent)':barColor}"></div></div>`:''}
     </div>`;
-  }).join('') + `<button class="month-add-btn" onclick="openDupCurrent()">+ mês seguinte</button>`;
+  }).join('') + `<button class="month-add-btn" onclick="openDupCurrent()">+ Mês seguinte</button>`;
 }
 
-function switchMonth(m) { activeMes = m; selected.clear(); render(); }
+
+function switchMonth(m) { activeMes = m; activeTipo = null; selected.clear(); render(); }
 
 // ── Stats ──────────────────────────────────────────────────────────────────
 function renderStats() {
@@ -859,9 +1012,32 @@ function filtered() {
   return data.filter(r =>
     r.mes === activeMes &&
     (!st || r.status === st) &&
-    (!q || r.cliente.toLowerCase().includes(q))
+    (!q || r.cliente.toLowerCase().includes(q) || (r.tipo||[]).some(t=>t.toLowerCase().includes(q))) &&
+    (!activeTipo || (r.tipo||[]).includes(activeTipo))
   );
 }
+
+function renderTipoFilter() {
+  const rows = data.filter(r => r.mes === activeMes);
+  const tipos = [...new Set(rows.flatMap(r => r.tipo||[]))].sort();
+  const bar = document.getElementById('tipoBar');
+  if (!tipos.length) { bar.style.display='none'; return; }
+  bar.style.display = 'flex';
+  let html = `<button class="tipo-pill ${activeTipo===null?'active':''}" onclick="setTipo(null)">Todos</button>`;
+  tipos.forEach(t => {
+    const cnt = rows.filter(r=>(r.tipo||[]).includes(t)).length;
+    const esc = t.replace(/'/g,"\'");
+    html += `<button class="tipo-pill ${activeTipo===t?'active':''}" onclick="setTipo('${esc}')">${t}<span style="font-size:10px;opacity:.75;margin-left:3px">${cnt}</span></button>`;
+  });
+  document.getElementById('tipoPills').innerHTML = html;
+}
+function setTipo(t) { activeTipo = t; render(); }
+
+function setRowSaving(id, v) {
+  const el = document.getElementById('row-'+id);
+  if (el) el.classList.toggle('row-saving', v);
+}
+
 
 function prazoDisplay(p) {
   if (!p) return '<span style="color:var(--text3)">—</span>';
@@ -881,175 +1057,78 @@ function statusBadge(s) {
 
 function render() {
   const rows = filtered();
+  const allRows = data.filter(r => r.mes === activeMes);
+  const hasFilter = document.getElementById('fSearch').value || document.getElementById('fStatus').value || activeTipo;
+
   if (!rows.length) {
-    document.getElementById('tbody').innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">📋</div><div>Sem entradas para este mês</div><div style="font-size:12px;margin-top:6px;color:var(--text3)">Use "+ Nova entrada" para adicionar</div></div></td></tr>`;
+    const msg = hasFilter
+      ? `<div class="empty"><div class="empty-icon">🔍</div>Sem resultados<br><button class="btn btn-sm" style="margin-top:12px" onclick="clearFilters()">Limpar filtros</button></div>`
+      : `<div class="empty"><div class="empty-icon">📋</div>Sem entradas para este mês<br><span style="font-size:12px;color:var(--text3)">Use "+ Nova entrada" ou a linha de entrada rápida abaixo</span></div>`;
+    document.getElementById('tbody').innerHTML = `<tr><td colspan="7">${msg}</td></tr>`;
   } else {
-    document.getElementById('tbody').innerHTML = rows.map(r => `
-      <tr>
+    document.getElementById('tbody').innerHTML = rows.map(r => {
+      let badge;
+      if (r.status==='Concluído') badge=`<span class="badge badge-ok" onclick="cycleStatus_id('${r.id}')" title="Clique para mudar">✓ Concluído</span>`;
+      else if (r.status==='Em andamento') badge=`<span class="badge badge-em" onclick="cycleStatus_id('${r.id}')" title="Clique para mudar">↻ Em andamento</span>`;
+      else badge=`<span class="badge badge-ni" onclick="cycleStatus_id('${r.id}')" title="Clique para mudar">◎ Não iniciado</span>`;
+
+      const tipoTags = (r.tipo||[]).map(t =>
+        `<span class="tag" style="cursor:pointer" onclick="setTipo('${t.replace(/'/g,"\'")}');" title="Filtrar por ${t}">${t}</span>`
+      ).join('');
+
+      return `<tr id="row-${r.id}">
         <td><input type="checkbox" ${selected.has(r.id)?'checked':''} onchange="toggleSel('${r.id}',this)"></td>
-        <td style="font-weight:500">${r.cliente}</td>
-        <td>
-        <select onchange="changeStatusInline('${r.id}',this.value)" title="Mudar estado"
-          class="status-select ${r.status==='Concluído'?'ok':r.status==='Em andamento'?'em':'ni'}">
-          <option value="Não iniciado" ${r.status==='Não iniciado'?'selected':''}>◎ Não iniciado</option>
-          <option value="Em andamento" ${r.status==='Em andamento'?'selected':''}>↻ Em andamento</option>
-          <option value="Concluído" ${r.status==='Concluído'?'selected':''}>✓ Concluído</option>
-        </select>
-      </td>
-        <td style="font-family:var(--mono);color:var(--text2)">${r.n||'—'}</td>
-        <td>${(r.tipo||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
+        <td class="td-cliente">${r.cliente}</td>
+        <td>${badge}</td>
+        <td style="font-family:var(--mono);color:var(--text2);font-size:12px">${r.n||'—'}</td>
+        <td>${tipoTags}</td>
         <td>${prazoDisplay(r.prazo)}</td>
-        <td><div style="display:flex;gap:4px">
-          <button class="btn btn-sm btn-icon" onclick="openEmail('${r.id}')" title="Enviar email">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          </button>
-          <button class="btn btn-sm btn-icon" onclick="openEdit('${r.id}')" title="Editar">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </button>
-          <button class="btn btn-sm btn-icon" onclick="duplicateSingle('${r.id}')" title="Duplicar para mês seguinte">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-          </button>
-          <button class="btn btn-sm btn-icon" onclick="openActivity('${r.id}')" title="Histórico">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </button>
-          <button class="btn btn-sm btn-icon btn-danger" onclick="deleteRow('${r.id}')" title="Mover para o lixo">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/></svg>
-          </button>
-        </div></td>
-      </tr>`).join('');
+        <td>
+          <div class="row-actions">
+            <button class="btn btn-sm btn-icon" onclick="openEmail('${r.id}')" title="Email">✉</button>
+            <button class="btn btn-sm btn-icon" onclick="openEdit('${r.id}')" title="Editar">✏</button>
+            <button class="btn btn-sm btn-icon" onclick="duplicateSingle('${r.id}')" title="Duplicar">⧉</button>
+            <button class="btn btn-sm btn-icon" onclick="openActivity('${r.id}')" title="Histórico">🕐</button>
+            <a href="${r.url}" target="_blank" class="btn btn-sm btn-icon" title="Abrir no Notion" style="text-decoration:none">↗</a>
+            <button class="btn btn-sm btn-icon btn-danger" onclick="deleteRow('${r.id}')" title="Apagar">🗑</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
   }
+
+  const fc = document.getElementById('filteredCount');
+  if (fc) fc.textContent = (hasFilter && rows.length !== allRows.length) ? `${rows.length} de ${allRows.length}` : '';
+
   renderStats();
   renderMonths();
   renderProgressBar();
+  renderTipoFilter();
   updateSelBar();
-  const fc = document.getElementById('filteredCount');
-  if (fc) fc.textContent = rows.length !== data.filter(r=>r.mes===activeMes).length ? `${rows.length} resultados` : '';
+  updateTrashCount();
   initQuickAdd();
 }
 
-// ── Selection ──────────────────────────────────────────────────────────────
-function toggleSel(id,el){ if(el.checked) selected.add(id); else selected.delete(id); updateSelBar(); }
-function toggleAll(el){ filtered().forEach(r=>{ if(el.checked) selected.add(r.id); else selected.delete(r.id); }); render(); }
-function clearSel(){ selected.clear(); render(); }
-function updateSelBar(){
-  const n = selected.size;
-  document.getElementById('selBar').classList.toggle('show', n>0);
-  document.getElementById('selCount').textContent = n;
-  document.getElementById('btnSendSel').style.display = n>0?'inline-flex':'none';
+function clearFilters() {
+  document.getElementById('fSearch').value = '';
+  document.getElementById('fStatus').value = '';
+  activeTipo = null;
+  render();
 }
 
-// ── Status cycle ───────────────────────────────────────────────────────────
-async function cycleStatus(id) {
-  const r = data.find(x=>x.id===id);
+async function cycleStatus_id(id) {
+  const r = data.find(x=>x.id===id); if(!r) return;
   const cycle = ['Não iniciado','Em andamento','Concluído'];
-  const oldStatus = r.status;
-  const newStatus = cycle[(cycle.indexOf(r.status)+1)%3];
-  r.status = newStatus; render(); renderProgressBar();
+  const old = r.status, next = cycle[(cycle.indexOf(old)+1)%3];
+  r.status = next; render(); setRowSaving(id, true);
   try {
-    await notionReq('/v1/pages/'+id,'PATCH',{properties:{Status:{status:{name:newStatus}}}});
-    logActivity(id, r.cliente, 'Estado alterado', `${oldStatus} → ${newStatus}`);
-    toast('Estado atualizado no Notion','success');
-  } catch(e){ toast('Erro ao atualizar: '+e.message,'error'); r.status=oldStatus; render(); renderProgressBar(); }
+    await notionReq('/v1/pages/'+id,'PATCH',{properties:{Status:{status:{name:next}}}});
+    logActivity(id, r.cliente, 'Estado alterado', old+' → '+next);
+    invalidateCache(); setRowSaving(id, false);
+    toast(`${r.cliente} → ${next}`, 'success');
+  } catch(e) { r.status=old; render(); setRowSaving(id, false); toast('Erro: '+e.message,'error'); }
 }
 
-// ── Delete ─────────────────────────────────────────────────────────────────
-const TRASH_KEY = 'prestacoes_trash';
-
-function loadTrash() {
-  return JSON.parse(localStorage.getItem(TRASH_KEY) || '[]');
-}
-function saveTrash(t) {
-  localStorage.setItem(TRASH_KEY, JSON.stringify(t));
-  updateTrashCount();
-}
-function updateTrashCount() {
-  const t = loadTrash();
-  const el = document.getElementById('trashCount');
-  if (t.length > 0) { el.style.display='inline'; el.textContent=t.length; }
-  else { el.style.display='none'; }
-}
-
-async function deleteRow(id) {
-  if (!confirm('Mover para o lixo? Pode recuperar mais tarde.')) return;
-  try {
-    await notionReq('/v1/pages/'+id,'PATCH',{archived:true});
-    const r = data.find(x=>x.id===id);
-    if (r) {
-      const trash = loadTrash();
-      trash.unshift({...r, deletedAt: new Date().toISOString()});
-      saveTrash(trash);
-    }
-    data = data.filter(x=>x.id!==id);
-    selected.delete(id); render();
-    toast('Movido para o lixo — pode recuperar no separador 🗑','success');
-  } catch(e){ toast('Erro: '+e.message,'error'); }
-}
-
-async function restoreFromTrash(id) {
-  const trash = loadTrash();
-  const r = trash.find(x=>x.id===id);
-  if (!r) return;
-  try {
-    await notionReq('/v1/pages/'+id,'PATCH',{archived:false});
-    data.push({...r, deletedAt:undefined});
-    const newTrash = trash.filter(x=>x.id!==id);
-    saveTrash(newTrash);
-    renderTrash();
-    render();
-    toast('Tarefa recuperada com sucesso','success');
-  } catch(e){ toast('Erro ao recuperar: '+e.message,'error'); }
-}
-
-async function deleteFromTrash(id) {
-  if (!confirm('Apagar definitivamente? Esta ação não pode ser desfeita.')) return;
-  const trash = loadTrash();
-  saveTrash(trash.filter(x=>x.id!==id));
-  renderTrash();
-  toast('Apagado definitivamente','success');
-}
-
-function emptyTrash() {
-  if (!confirm('Esvaziar o lixo? Todas as entradas serão apagadas definitivamente.')) return;
-  saveTrash([]);
-  renderTrash();
-  toast('Lixo esvaziado','success');
-}
-
-function renderTrash() {
-  const trash = loadTrash();
-  const tbody = document.getElementById('trashBody');
-  if (!trash.length) {
-    tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="empty-icon">🗑</div>O lixo está vazio</div></td></tr>';
-    return;
-  }
-  tbody.innerHTML = trash.map(r => `
-    <tr>
-      <td style="font-weight:500">${r.cliente}</td>
-      <td>${(r.tipo||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
-      <td style="font-family:var(--mono);font-size:12px">${r.mes||'—'}</td>
-      <td>${r.prazo ? new Date(r.prazo).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'}) : '—'}</td>
-      <td style="font-size:12px;color:var(--text2)">${r.deletedAt ? new Date(r.deletedAt).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
-      <td><div style="display:flex;gap:4px">
-        <button class="btn btn-sm" onclick="restoreFromTrash('${r.id}')">↩ Recuperar</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteFromTrash('${r.id}')">✕</button>
-      </div></td>
-    </tr>`).join('');
-}
-
-// ── Entry modal ────────────────────────────────────────────────────────────
-function buildTipoCheckboxes(selected=[]) {
-  document.getElementById('tipoCheckboxes').innerHTML = getTipos().map(t => `
-    <label style="display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:12px;background:${selected.includes(t)?'var(--accent-l)':'var(--surface)'};color:${selected.includes(t)?'var(--accent-d)':'var(--text)'}">
-      <input type="checkbox" ${selected.includes(t)?'checked':''} value="${t}" onchange="updateTipoStyle(this)" style="height:auto;width:auto"> ${t}
-    </label>`).join('');
-}
-
-function updateTipoStyle(el){
-  el.parentElement.style.background = el.checked?'var(--accent-l)':'var(--surface)';
-  el.parentElement.style.color = el.checked?'var(--accent-d)':'var(--text)';
-}
-
-function getSelectedTipos(){ return [...document.querySelectorAll('#tipoCheckboxes input:checked')].map(x=>x.value); }
 
 function openAdd(){
   editingId=null;
@@ -1058,7 +1137,7 @@ function openAdd(){
   document.getElementById('aStatus').value='Não iniciado';
   document.getElementById('aN').value='';
   buildTipoCheckboxes();
-  document.getElementById('aMes').value=activeMes;
+  populateMesSelect('aMes', activeMes);
   document.getElementById('aPrazo').value='';
   document.getElementById('aEmail').value='';
   document.getElementById('entryModal').classList.add('open');
@@ -1073,7 +1152,7 @@ function openEdit(id){
   document.getElementById('aStatus').value=r.status;
   document.getElementById('aN').value=r.n||'';
   buildTipoCheckboxes(r.tipo||[]);
-  document.getElementById('aMes').value=r.mes;
+  populateMesSelect('aMes', r.mes);
   document.getElementById('aPrazo').value=r.prazo||'';
   document.getElementById('aEmail').value=emailsMap[r.cliente]||'';
   document.getElementById('entryModal').classList.add('open');
@@ -1113,6 +1192,7 @@ async function saveEntry(){
     }
     activeMes=mes;
     closeModal('entryModal');
+    invalidateCache();
     render();
     renderProgressBar();
     logActivity(entry.id||saved.id, cliente, editingId ? 'Entrada editada' : 'Entrada criada', (tipos||[]).join(', '));
@@ -1147,7 +1227,7 @@ async function duplicateSingle(id) {
 // ── Duplicate ──────────────────────────────────────────────────────────────
 function openDup(mes){
   document.getElementById('dupFrom').textContent=mes;
-  document.getElementById('dupMes').value=nextMonthStr(mes);
+  populateMesSelect('dupMes', nextMonthStr(mes));
   document.getElementById('dupPrazo').value='';
   document.getElementById('dupModal').classList.add('open');
   setTimeout(()=>document.getElementById('dupMes').focus(),100);
@@ -1163,7 +1243,7 @@ function openDupSel(){
 
 async function doDuplicate(){
   const fromMes=document.getElementById('dupFrom').textContent;
-  const toMes=document.getElementById('dupMes').value.trim().toUpperCase();
+  const toMes=document.getElementById('dupMes').value.trim();
   const newPrazo=document.getElementById('dupPrazo').value||null;
   if(!toMes){alert('Indique o mês de destino.');return;}
 
@@ -1189,9 +1269,13 @@ async function doDuplicate(){
       data.push({id:saved.id,cliente:r.cliente,status:'Não iniciado',n:r.n,tipo:r.tipo,mes:toMes,prazo:prazo||null,url:saved.url});
       logActivity(saved.id, r.cliente, 'Duplicado em lote de '+fromMes, 'Para '+toMes);
       created++;
+    if(dpBar){dpBar.style.width=Math.round(created/source.length*100)+'%';}
+    if(dpLabel){dpLabel.textContent=created+' de '+source.length+' duplicados…';}
     }
     activeMes=toMes;
     closeModal('dupModal');
+    if(dpWrap) dpWrap.style.display='none';
+    invalidateCache();
     render();
     toast(`${created} entradas duplicadas para ${toMes} no Notion ✓`,'success');
   } catch(e){ toast('Erro: '+e.message,'error'); }
@@ -1241,7 +1325,7 @@ function doSendEmail(){
   const body=encodeURIComponent(document.getElementById('eBody').value);
   let mailto=`mailto:${to}?subject=${subj}&body=${body}`;
   if(cc) mailto+=`&cc=${encodeURIComponent(cc)}`;
-  window.open(mailto,'_blank');
+  window.location.href = mailto;
   // save to history
   const rows = selected.size>0 ? data.filter(r=>selected.has(r.id)) : [];
   const clientes = rows.length ? rows.map(r=>r.cliente) : [to];
@@ -1362,6 +1446,7 @@ async function bulkChangeStatus(newStatus) {
 let currentTab = 'main';
 
 function switchTab(tab) {
+  if(tab !== 'main') activeTipo = null;
   currentTab = tab;
   document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
   const activeBtn = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
@@ -1571,6 +1656,15 @@ function renderHistory() {
       <td style="font-size:12px">${(h.clientes||[]).join(', ')}</td>
       <td><span style="font-family:var(--mono);font-size:11px;background:var(--surface2);padding:2px 6px;border-radius:4px">${h.mes||'—'}</span></td>
     </tr>`).join('');
+}
+
+function resendEmail(id) {
+  const h=emailHistory.find(x=>x.id===id);if(!h)return;
+  resetEmailModal();
+  document.getElementById('eTo').value=h.to||'';
+  document.getElementById('eSubj').value=h.subj||'';
+  document.getElementById('eBody').value='';
+  document.getElementById('emailModal').classList.add('open');
 }
 
 // ── Prazos view ────────────────────────────────────────────────────────────────
@@ -1960,6 +2054,8 @@ function selectCliente(nome) {
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
+setInterval(()=>{ if(document.visibilityState==='visible'&&token) loadData(true); },5*60*1000);
+
 const savedToken = localStorage.getItem(TOKEN_KEY);
 const savedWorker = localStorage.getItem('prestacoes_worker_url');
 if(savedToken && savedWorker){
@@ -1972,6 +2068,7 @@ if(savedToken && savedWorker){
 } else if(savedToken && !savedWorker) {
   document.getElementById('tokenInput').value = savedToken;
 }
+
 </script>
 </body>
 </html>
