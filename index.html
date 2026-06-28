@@ -313,6 +313,32 @@ tbody tr:hover .row-actions { opacity:1; }
 .hist-resend { opacity:0; transition:opacity var(--transition); }
 tr:hover .hist-resend { opacity:1; }
 
+/* ── Tipo Manager ───────────────────────────────────────────────────────── */
+.tipo-manager-grid { display:grid; gap:6px; }
+.tipo-item {
+  display:flex; align-items:center; gap:10px;
+  background:var(--surface); border:1.5px solid var(--border);
+  border-radius:var(--radius-sm); padding:10px 14px;
+  transition:all var(--transition); cursor:default;
+}
+.tipo-item:hover { border-color:var(--border2); box-shadow:var(--shadow); }
+.tipo-item.is-base { background:var(--surface2); }
+.tipo-item.editing { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,110,247,.1); }
+.tipo-drag-handle { color:var(--text3); cursor:grab; font-size:14px; flex-shrink:0; user-select:none; }
+.tipo-drag-handle:active { cursor:grabbing; }
+.tipo-name-display { flex:1; font-size:13px; font-weight:600; font-family:var(--mono); }
+.tipo-name-input { flex:1; border:none; background:transparent; font-size:13px; font-weight:600; font-family:var(--mono); outline:none; color:var(--text); }
+.tipo-usage { font-size:11px; color:var(--text3); background:var(--surface2); padding:2px 7px; border-radius:8px; white-space:nowrap; font-family:'Inter',sans-serif; }
+.tipo-base-badge { font-size:10px; color:var(--accent); background:var(--accent-l); padding:2px 7px; border-radius:8px; font-weight:600; white-space:nowrap; }
+.tipo-actions { display:flex; gap:4px; opacity:0; transition:opacity var(--transition); }
+.tipo-item:hover .tipo-actions { opacity:1; }
+.tipo-item.editing .tipo-actions { opacity:1; }
+.tipo-add-bar { display:flex; gap:8px; margin-bottom:14px; }
+.tipo-add-bar input { flex:1; height:38px; padding:0 12px; border:1.5px solid var(--border); border-radius:var(--radius-sm); font-size:13px; font-family:'Inter',sans-serif; outline:none; transition:border-color var(--transition); background:var(--surface); color:var(--text); }
+.tipo-add-bar input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,110,247,.1); }
+.tipo-section-label { font-size:10.5px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:.08em; margin:16px 0 8px; display:flex; align-items:center; gap:8px; }
+.tipo-section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+
 @media(max-width:640px){
   .stats{grid-template-columns:repeat(2,1fr)}
   .topbar{padding:0 16px;gap:8px}
@@ -390,6 +416,10 @@ tr:hover .hist-resend { opacity:1; }
         <button class="nav-tab" id="tabTrash" onclick="switchTab('trash')">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/></svg>
           <span id="trashCount" style="display:none;background:#fca5a5;color:#7f1d1d;border-radius:8px;padding:0 5px;font-size:10px;font-weight:600;margin-left:2px"></span>
+        </button>
+        <button class="nav-tab" id="tabTipos" onclick="switchTab('tipos')">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          Tipos
         </button>
       </nav>
       <div style="display:flex;gap:6px;align-items:center">
@@ -563,6 +593,46 @@ tr:hover .hist-resend { opacity:1; }
         <tbody id="trashBody"></tbody>
       </table>
     </div>
+
+
+    <!-- Tipos view -->
+    <!-- Tipos View (inside main) -->
+    <div id="tabTiposView" style="display:none">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <div>
+          <div style="font-size:18px;font-weight:800">Tipos de Tarefa</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:3px">Gerir, criar, renomear e reordenar os tipos disponíveis</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" onclick="resetTiposBase()" title="Repor tipos base">↺ Repor base</button>
+        </div>
+      </div>
+    
+      <!-- Add new tipo -->
+      <div class="tipo-add-bar">
+        <input type="text" id="newTipoInput" placeholder="Nome do novo tipo… ex: IRS Herança 2025"
+          onkeydown="if(event.key==='Enter') addTipoFromManager()"
+          oninput="validateNewTipo(this.value)">
+        <button class="btn btn-primary" onclick="addTipoFromManager()" id="addTipoBtn">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Adicionar tipo
+        </button>
+      </div>
+      <div id="newTipoError" style="font-size:12px;color:var(--red);margin:-8px 0 10px;display:none"></div>
+    
+      <!-- Custom tipos -->
+      <div class="tipo-section-label" id="customTiposLabel">Tipos personalizados</div>
+      <div class="tipo-manager-grid" id="customTiposList"></div>
+      <div id="noCustomTipos" style="display:none;text-align:center;padding:24px;color:var(--text3);font-size:13px;background:var(--surface2);border-radius:var(--radius-sm);border:1.5px dashed var(--border)">
+        Sem tipos personalizados ainda.<br>
+        <span style="font-size:12px">Adicione acima para criar os seus próprios tipos de tarefa.</span>
+      </div>
+    
+      <!-- Base tipos -->
+      <div class="tipo-section-label" style="margin-top:20px">Tipos base <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0">(sempre disponíveis)</span></div>
+      <div class="tipo-manager-grid" id="baseTiposList"></div>
+    </div>
+
   </div>
 </div>
 
@@ -643,7 +713,10 @@ tr:hover .hist-resend { opacity:1; }
         <div class="field"><label>Prazo</label><input id="aPrazo" type="date"></div>
         <div class="field span-2"><label>Email do cliente</label><input id="aEmail" type="email" placeholder="cliente@email.com"></div>
         <div class="field span-2">
-          <label>Novo tipo de tarefa (opcional)</label>
+          <label style="display:flex;align-items:center;justify-content:space-between">
+            Novo tipo personalizado
+            <button type="button" onclick="closeModal('entryModal');switchTab('tipos')" style="font-size:11px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;text-decoration:underline">Gerir tipos →</button>
+          </label>
           <div style="display:flex;gap:8px">
             <input id="aNovoTipo" type="text" placeholder="ex: IRS Empresas 2025" style="flex:1">
             <button class="btn btn-sm" type="button" onclick="addCustomTipo()">+ Adicionar</button>
@@ -1457,7 +1530,8 @@ function switchTab(tab) {
   document.getElementById('tabPrazosView').style.display = tab==='prazos' ? 'block' : 'none';
   document.getElementById('tabTrashView').style.display = tab==='trash' ? 'block' : 'none';
   document.getElementById('tabKanbanView').style.display = tab==='kanban' ? 'block' : 'none';
-  const mainEls = ['stats','monthNavBar','toolbar','selBar','progressBar'];
+  document.getElementById('tabTiposView').style.display = tab==='tipos' ? 'block' : 'none';
+  const mainEls = ['stats','monthNavBar','toolbar','selBar','progressBar','tipoBar'];
   mainEls.forEach(id => { const el=document.getElementById(id); if(el) el.style.display = tab==='main' ? '' : 'none'; });
   document.querySelector('.table-wrap').style.display = tab==='main' ? '' : 'none';
   const qar = document.getElementById('quickAddRow');
@@ -1467,6 +1541,7 @@ function switchTab(tab) {
   if (tab==='prazos') renderPrazos();
   if (tab==='trash') renderTrash();
   if (tab==='kanban') renderKanban();
+  if (tab==='tipos') renderTiposManager();
 }
 
 // ── Client view ────────────────────────────────────────────────────────────────
@@ -1707,6 +1782,8 @@ function renderPrazos() {
 }
 
 // ── Custom tipos ───────────────────────────────────────────────────────────────
+
+// Legacy: still used inside entry modal
 function addCustomTipo() {
   const val = document.getElementById('aNovoTipo').value.trim();
   if (!val) return;
@@ -1717,9 +1794,207 @@ function addCustomTipo() {
     toast('Tipo "' + val + '" adicionado', 'success');
   }
   document.getElementById('aNovoTipo').value = '';
-  // refresh checkboxes with new tipo selected
   const currentSelected = getSelectedTipos();
   buildTipoCheckboxes([...currentSelected, val]);
+}
+
+// ── TIPOS MANAGER ─────────────────────────────────────────────────────────────
+let dragTipo = null;
+let dragTipoOver = null;
+
+function getCustomTipos() {
+  return JSON.parse(localStorage.getItem(CUSTOM_TIPOS_KEY) || '[]');
+}
+function saveCustomTipos(arr) {
+  localStorage.setItem(CUSTOM_TIPOS_KEY, JSON.stringify(arr));
+}
+
+function getTipoUsage(nome) {
+  return data.filter(r => (r.tipo||[]).includes(nome)).length;
+}
+
+function validateNewTipo(val) {
+  const err = document.getElementById('newTipoError');
+  const btn = document.getElementById('addTipoBtn');
+  const all = getTipos();
+  if (val && all.map(t=>t.toLowerCase()).includes(val.toLowerCase())) {
+    err.textContent = '"' + val + '" já existe.';
+    err.style.display = 'block';
+    btn.disabled = true;
+  } else {
+    err.style.display = 'none';
+    btn.disabled = false;
+  }
+}
+
+function addTipoFromManager() {
+  const input = document.getElementById('newTipoInput');
+  const val = input.value.trim();
+  if (!val) { input.focus(); return; }
+  const all = getTipos();
+  if (all.map(t=>t.toLowerCase()).includes(val.toLowerCase())) {
+    toast('Esse tipo já existe', 'error'); return;
+  }
+  const custom = getCustomTipos();
+  custom.push(val);
+  saveCustomTipos(custom);
+  input.value = '';
+  document.getElementById('newTipoError').style.display = 'none';
+  document.getElementById('addTipoBtn').disabled = false;
+  renderTiposManager();
+  toast('"' + val + '" adicionado ✓', 'success');
+}
+
+function startEditTipo(nome, isBase) {
+  if (isBase) { toast('Os tipos base não podem ser renomeados', ''); return; }
+  const itemEl = document.querySelector(`[data-tipo="${CSS.escape(nome)}"]`);
+  if (!itemEl) return;
+  itemEl.classList.add('editing');
+  const display = itemEl.querySelector('.tipo-name-display');
+  const input = itemEl.querySelector('.tipo-name-input');
+  display.style.display = 'none';
+  input.style.display = 'block';
+  input.focus();
+  input.select();
+}
+
+function saveTipoRename(oldName, inputEl) {
+  const newName = inputEl.value.trim();
+  const itemEl = inputEl.closest('.tipo-item');
+  if (!newName || newName === oldName) {
+    cancelTipoRename(itemEl, oldName, inputEl);
+    return;
+  }
+  if (getTipos().map(t=>t.toLowerCase()).includes(newName.toLowerCase()) && newName.toLowerCase() !== oldName.toLowerCase()) {
+    toast('"' + newName + '" já existe', 'error');
+    inputEl.focus(); return;
+  }
+  // Update custom tipos list
+  const custom = getCustomTipos().map(t => t === oldName ? newName : t);
+  saveCustomTipos(custom);
+  // Update all data entries in memory
+  const count = data.filter(r => (r.tipo||[]).includes(oldName)).length;
+  data.forEach(r => {
+    if (r.tipo) r.tipo = r.tipo.map(t => t === oldName ? newName : t);
+  });
+  invalidateCache();
+  renderTiposManager();
+  if (count > 0) toast(`"${oldName}" → "${newName}" · ${count} tarefa(s) atualizadas ✓`, 'success');
+  else toast(`Renomeado para "${newName}" ✓`, 'success');
+}
+
+function cancelTipoRename(itemEl, oldName, inputEl) {
+  itemEl.classList.remove('editing');
+  const display = itemEl.querySelector('.tipo-name-display');
+  display.style.display = 'block';
+  inputEl.style.display = 'none';
+  inputEl.value = oldName;
+}
+
+function deleteTipo(nome) {
+  const usage = getTipoUsage(nome);
+  const msg = usage > 0
+    ? `"${nome}" está em uso em ${usage} tarefa(s). Será removido dessas tarefas também.`
+    : `"${nome}" não tem tarefas associadas.`;
+  confirmAction('Apagar tipo?', msg, 'Apagar', () => {
+    const custom = getCustomTipos().filter(t => t !== nome);
+    saveCustomTipos(custom);
+    if (usage > 0) {
+      data.forEach(r => { if (r.tipo) r.tipo = r.tipo.filter(t => t !== nome); });
+      invalidateCache();
+    }
+    renderTiposManager();
+    toast('"' + nome + '" apagado ✓', 'success');
+  });
+}
+
+function resetTiposBase() {
+  confirmAction('Repor tipos base?', 'Os seus tipos personalizados serão mantidos. Apenas os tipos base são repostos.', 'Repor', () => {
+    renderTiposManager();
+    toast('Tipos base repostos ✓', 'success');
+  });
+}
+
+// Drag to reorder custom tipos
+function tiposDragStart(e, nome) {
+  dragTipo = nome;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => e.target.closest('.tipo-item').style.opacity = '0.4', 0);
+}
+function tiposDragEnd(e) {
+  e.target.closest('.tipo-item').style.opacity = '1';
+  document.querySelectorAll('.tipo-item').forEach(el => el.style.background = '');
+  dragTipo = null; dragTipoOver = null;
+}
+function tiposDragOver(e, nome) {
+  e.preventDefault();
+  if (dragTipo === nome) return;
+  dragTipoOver = nome;
+  document.querySelectorAll('.tipo-item[data-custom="true"]').forEach(el => {
+    el.style.borderColor = el.dataset.tipo === nome ? 'var(--accent)' : '';
+    el.style.background = el.dataset.tipo === nome ? 'var(--accent-l)' : '';
+  });
+}
+function tiposDrop(e, targetNome) {
+  e.preventDefault();
+  if (!dragTipo || dragTipo === targetNome) return;
+  const custom = getCustomTipos();
+  const fromIdx = custom.indexOf(dragTipo);
+  const toIdx = custom.indexOf(targetNome);
+  if (fromIdx < 0 || toIdx < 0) return;
+  custom.splice(fromIdx, 1);
+  custom.splice(toIdx, 0, dragTipo);
+  saveCustomTipos(custom);
+  renderTiposManager();
+}
+
+function renderTiposManager() {
+  const custom = getCustomTipos();
+  const customList = document.getElementById('customTiposList');
+  const noCustom = document.getElementById('noCustomTipos');
+  const baseList = document.getElementById('baseTiposList');
+
+  // Custom tipos
+  if (!custom.length) {
+    customList.innerHTML = '';
+    noCustom.style.display = 'block';
+  } else {
+    noCustom.style.display = 'none';
+    customList.innerHTML = custom.map(nome => {
+      const usage = getTipoUsage(nome);
+      return `<div class="tipo-item" data-tipo="${nome}" data-custom="true"
+        draggable="true"
+        ondragstart="tiposDragStart(event,'${nome.replace(/'/g,"\'")}');"
+        ondragend="tiposDragEnd(event)"
+        ondragover="tiposDragOver(event,'${nome.replace(/'/g,"\'")}');"
+        ondrop="tiposDrop(event,'${nome.replace(/'/g,"\'")}');">
+        <span class="tipo-drag-handle" title="Arrastar para reordenar">⠿</span>
+        <span class="tipo-name-display">${nome}</span>
+        <input class="tipo-name-input" type="text" value="${nome}" style="display:none"
+          onkeydown="if(event.key==='Enter')saveTipoRename('${nome.replace(/'/g,"\'")}',this);if(event.key==='Escape')cancelTipoRename(this.closest('.tipo-item'),'${nome.replace(/'/g,"\'")}',this)"
+          onblur="saveTipoRename('${nome.replace(/'/g,"\'")}',this)">
+        <span class="tipo-usage">${usage > 0 ? usage + (usage===1?' tarefa':' tarefas') : 'sem uso'}</span>
+        <div class="tipo-actions">
+          <button class="btn btn-sm btn-icon" onclick="startEditTipo('${nome.replace(/'/g,"\'")}',false)" title="Renomear">✏</button>
+          <button class="btn btn-sm btn-icon btn-danger" onclick="deleteTipo('${nome.replace(/'/g,"\'")}');" title="Apagar">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Base tipos
+  baseList.innerHTML = TIPOS_BASE.map(nome => {
+    const usage = getTipoUsage(nome);
+    return `<div class="tipo-item is-base" data-tipo="${nome}">
+      <span style="color:var(--border2);font-size:14px;flex-shrink:0">⠿</span>
+      <span class="tipo-name-display">${nome}</span>
+      <span class="tipo-base-badge">base</span>
+      <span class="tipo-usage">${usage > 0 ? usage + (usage===1?' tarefa':' tarefas') : 'sem uso'}</span>
+      <div class="tipo-actions">
+        <button class="btn btn-sm" style="font-size:11px" onclick="startEditTipo('${nome}',true)" title="Tipos base não podem ser renomeados" disabled>✏</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
