@@ -470,15 +470,16 @@ tr:hover .hist-resend { opacity:1; }
     <div class="toolbar">
       <div class="search-wrap">
         <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="fSearch" placeholder="Pesquisar cliente…" oninput="clearTimeout(window._st);window._st=setTimeout(render,150)">
+        <input type="text" id="fSearch" placeholder="Pesquisar cliente…" oninput="clearTimeout(window._st);window._st=setTimeout(render,150)" onchange="render()">
       </div>
       <select id="fStatus" onchange="render()" style="height:36px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;padding:0 10px;background:var(--surface);color:var(--text);font-family:'Inter',sans-serif;outline:none">
         <option value="">Todos os estados</option>
-        <option value="Não iniciado">◎ Pendente</option>
+        <option value="Não iniciado">◎ Não iniciado</option>
         <option value="Em andamento">↻ Em andamento</option>
         <option value="Concluído">✓ Concluído</option>
       </select>
-      <span id="filteredCount" style="font-size:12px;color:var(--text3);margin-left:4px"></span>
+      <span id="filteredCount" style="font-size:12px;color:var(--text3);margin-left:4px;display:flex;gap:4px;align-items:center;flex-wrap:wrap"></span>
+      <button id="clearFiltersBtn" onclick="clearFilters()" style="display:none;font-size:11px;padding:2px 8px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;color:var(--text2);font-family:'Inter',sans-serif">✕ Limpar filtros</button>
       <div style="margin-left:auto">
         <button class="btn btn-sm" id="btnSendSel" style="display:none" onclick="openEmailSel()">
           <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
@@ -784,12 +785,27 @@ tr:hover .hist-resend { opacity:1; }
 
 <!-- Dup Modal -->
 <div class="overlay" id="dupModal">
-  <div class="modal" style="width:400px">
+  <div class="modal" style="width:480px">
     <div class="modal-header"><h2>⧉ Duplicar mês</h2><button class="btn btn-sm btn-icon" onclick="closeModal('dupModal')">✕</button></div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Copia as entradas de <strong id="dupFrom"></strong> para o mês seguinte, repondo o estado para "Não iniciado".</p>
-      <div class="field"><label>Mês de destino</label><select id="dupMes" style="font-family:var(--mono)"></select></div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Copia as entradas de <strong id="dupFrom"></strong> para o mês de destino, repondo o estado para "Não iniciado".</p>
+      <div class="field"><label>Mês de destino</label><select id="dupMes" style="font-family:var(--mono)" onchange="previewDupConflicts()"></select></div>
       <div class="field"><label>Novo prazo para todas (opcional)</label><input id="dupPrazo" type="date"></div>
+
+      <!-- Conflict preview -->
+      <div id="dupConflictPreview" style="display:none;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Análise de conflitos</div>
+        <div id="dupConflictStats" style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap"></div>
+        <div class="field" style="margin-bottom:0">
+          <label>Clientes que já existem no mês de destino</label>
+          <select id="dupConflictMode" style="font-family:var(--mono)">
+            <option value="skip">Ignorar (não duplicar os que já existem) — recomendado</option>
+            <option value="all">Duplicar todos (pode criar duplicados)</option>
+          </select>
+        </div>
+        <div id="dupConflictInfo" style="display:none;margin-top:8px;padding:10px 12px;background:var(--yellow-bg);border:1px solid #FCD34D;border-radius:7px;font-size:12px;color:var(--yellow);display:flex;gap:8px;align-items:flex-start"></div>
+      </div>
+
       <div id="dupProgress" style="display:none;margin-top:12px">
         <div style="font-size:12px;color:var(--text2);margin-bottom:6px" id="dupProgressLabel">A duplicar…</div>
         <div class="dup-prog-track"><div class="dup-prog-fill" id="dupProgressBar" style="width:0%"></div></div>
@@ -1182,10 +1198,16 @@ function render() {
 
   const fc = document.getElementById('filteredCount');
   if (fc) {
+    const stVal = document.getElementById('fStatus').value;
+    const qVal = document.getElementById('fSearch').value.trim();
     let chips = [];
     if (filterLate) chips.push('<span style="background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="clearFilters()">⚠ Em atraso ×</span>');
+    if (stVal) chips.push('<span style="background:var(--accent-l);color:var(--accent-d);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="document.getElementById('fStatus').value='';render()">'+stVal+' ×</span>');
+    if (qVal) chips.push('<span style="background:var(--surface2);color:var(--text2);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="document.getElementById('fSearch').value='';render()">"'+qVal+'" ×</span>');
     if (activeTipo) chips.push('<span style="background:var(--accent-l);color:var(--accent-d);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="setTipo(null)">'+activeTipo+' ×</span>');
     const countText = hasFilter ? rows.length+' de '+allRows.length : '';
+    const clearBtn = document.getElementById('clearFiltersBtn');
+    if (clearBtn) clearBtn.style.display = hasFilter ? 'inline-block' : 'none';
     fc.innerHTML = chips.join('') + (countText ? '<span style="margin-left:6px;font-size:12px;color:var(--text3)">'+countText+'</span>' : '');
   }
 
@@ -1219,6 +1241,40 @@ async function cycleStatus_id(id) {
   } catch(e) { r.status=old; render(); setRowSaving(id, false); toast('Erro: '+e.message,'error'); }
 }
 
+
+// ── Selection ──────────────────────────────────────────────────────────────
+function toggleSel(id, el) {
+  if (el.checked) selected.add(id);
+  else selected.delete(id);
+  updateSelBar();
+}
+
+function toggleAll(el) {
+  const rows = filteredSorted();
+  rows.forEach(r => { if (el.checked) selected.add(r.id); else selected.delete(r.id); });
+  render();
+}
+
+function clearSel() {
+  selected.clear();
+  render();
+}
+
+function updateSelBar() {
+  const n = selected.size;
+  const bar = document.getElementById('selBar');
+  if (bar) bar.classList.toggle('show', n > 0);
+  const cnt = document.getElementById('selCount');
+  if (cnt) cnt.textContent = n;
+  const btn = document.getElementById('btnSendSel');
+  if (btn) btn.style.display = n > 0 ? 'inline-flex' : 'none';
+  const chk = document.getElementById('chkAll');
+  if (chk) {
+    const rows = filteredSorted();
+    chk.checked = rows.length > 0 && rows.every(r => selected.has(r.id));
+    chk.indeterminate = rows.some(r => selected.has(r.id)) && !chk.checked;
+  }
+}
 
 function openAdd(){
   editingId=null;
@@ -1321,8 +1377,13 @@ function openDup(mes){
   document.getElementById('dupFrom').textContent=mes;
   populateMesSelect('dupMes', nextMonthStr(mes));
   document.getElementById('dupPrazo').value='';
+  const cprev=document.getElementById('dupConflictPreview');
+  if(cprev) cprev.style.display='none';
+  const cinfo=document.getElementById('dupConflictInfo');
+  if(cinfo) cinfo.style.display='none';
   document.getElementById('dupModal').classList.add('open');
-  setTimeout(()=>document.getElementById('dupMes').focus(),100);
+  // preview conflicts after modal opens
+  setTimeout(previewDupConflicts, 150);
 }
 
 function openDupCurrent(){ openDup(activeMes); }
@@ -1337,17 +1398,40 @@ async function doDuplicate(){
   const fromMes=document.getElementById('dupFrom').textContent;
   const toMes=document.getElementById('dupMes').value.trim();
   const newPrazo=document.getElementById('dupPrazo').value||null;
-  if(!toMes){alert('Indique o mês de destino.');return;}
+  const conflictMode=document.getElementById('dupConflictMode')?.value||'skip';
+  if(!toMes){toast('Indique o mês de destino','error');return;}
 
   const source=data.filter(r=>r.mes===fromMes);
   if(!source.length){toast('Sem entradas para duplicar','error');return;}
 
+  // Detect conflicts: clientes that already exist in toMes
+  const existing=data.filter(r=>r.mes===toMes);
+  const existingKeys=new Set(existing.map(r=>r.cliente+'|'+(r.tipo||[]).sort().join(',')));
+  const conflicts=source.filter(r=>existingKeys.has(r.cliente+'|'+(r.tipo||[]).sort().join(',')));
+  const toCreate=conflictMode==='skip'
+    ? source.filter(r=>!existingKeys.has(r.cliente+'|'+(r.tipo||[]).sort().join(',')))
+    : source; // 'overwrite' or 'all' = create all
+
+  if(conflicts.length && conflictMode==='skip'){
+    const skipNames=conflicts.map(r=>r.cliente+(r.tipo.length?' ('+r.tipo.join(', ')+')':'')).join(', ');
+    showDupConflictInfo(conflicts.length, source.length, skipNames);
+  }
+
+  if(!toCreate.length){
+    toast(`Todos os ${conflicts.length} clientes já existem em ${toMes} — nada a duplicar`,'');
+    return;
+  }
+
   const btn=document.getElementById('dupBtn');
+  const dpWrap=document.getElementById('dupProgress');
+  const dpBar=document.getElementById('dupProgressBar');
+  const dpLabel=document.getElementById('dupProgressLabel');
   btn.disabled=true; btn.textContent='A duplicar…';
+  if(dpWrap) dpWrap.style.display='block';
 
   try {
     let created=0;
-    for(const r of source){
+    for(const r of toCreate){
       const props={
         'Cliente':{title:[{text:{content:r.cliente}}]},
         'Status':{status:{name:'Não iniciado'}},
@@ -1359,19 +1443,77 @@ async function doDuplicate(){
       if(prazo) props['Prazo']={date:{start:prazo}};
       const saved=await notionReq('/v1/pages','POST',{parent:{database_id:DB_ID},properties:props});
       data.push({id:saved.id,cliente:r.cliente,status:'Não iniciado',n:r.n,tipo:r.tipo,mes:toMes,prazo:prazo||null,url:saved.url});
-      logActivity(saved.id, r.cliente, 'Duplicado em lote de '+fromMes, 'Para '+toMes);
+      logActivity(saved.id,r.cliente,'Duplicado em lote de '+fromMes,'Para '+toMes);
       created++;
-    if(dpBar){dpBar.style.width=Math.round(created/source.length*100)+'%';}
-    if(dpLabel){dpLabel.textContent=created+' de '+source.length+' duplicados…';}
+      if(dpBar) dpBar.style.width=Math.round(created/toCreate.length*100)+'%';
+      if(dpLabel) dpLabel.textContent=created+' de '+toCreate.length+' duplicados…';
     }
     activeMes=toMes;
     closeModal('dupModal');
     if(dpWrap) dpWrap.style.display='none';
     invalidateCache();
     render();
-    toast(`${created} entradas duplicadas para ${toMes} no Notion ✓`,'success');
+    const skipped=source.length-toCreate.length;
+    const msg=skipped>0
+      ? `${created} criados, ${skipped} já existiam e foram ignorados ✓`
+      : `${created} entradas duplicadas para ${toMes} ✓`;
+    toast(msg,'success');
   } catch(e){ toast('Erro: '+e.message,'error'); }
   finally{ btn.disabled=false; btn.textContent='Duplicar no Notion →'; }
+}
+
+function previewDupConflicts() {
+  const fromMes=document.getElementById('dupFrom').textContent;
+  const toMes=document.getElementById('dupMes').value;
+  if(!toMes) return;
+
+  const source=data.filter(r=>r.mes===fromMes);
+  const existing=data.filter(r=>r.mes===toMes);
+  const existingKeys=new Set(existing.map(r=>r.cliente+'|'+(r.tipo||[]).sort().join(',')));
+  const conflicts=source.filter(r=>existingKeys.has(r.cliente+'|'+(r.tipo||[]).sort().join(',')));
+  const toCreate=source.filter(r=>!existingKeys.has(r.cliente+'|'+(r.tipo||[]).sort().join(',')));
+
+  const preview=document.getElementById('dupConflictPreview');
+  const stats=document.getElementById('dupConflictStats');
+  const info=document.getElementById('dupConflictInfo');
+
+  if(!source.length){ if(preview) preview.style.display='none'; return; }
+  if(preview) preview.style.display='block';
+  if(info) info.style.display='none';
+
+  const pct=source.length?Math.round(toCreate.length/source.length*100):0;
+  stats.innerHTML=`
+    <div style="flex:1;background:var(--surface2);border-radius:8px;padding:10px 12px;text-align:center;border:1px solid var(--border)">
+      <div style="font-size:20px;font-weight:800;color:var(--accent)">${toCreate.length}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:2px">a criar</div>
+    </div>
+    <div style="flex:1;background:${conflicts.length?'var(--yellow-bg)':'var(--surface2)'};border-radius:8px;padding:10px 12px;text-align:center;border:1px solid ${conflicts.length?'#FCD34D':'var(--border)'}">
+      <div style="font-size:20px;font-weight:800;color:${conflicts.length?'var(--yellow)':'var(--text3)'}">${conflicts.length}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:2px">já existem</div>
+    </div>
+    <div style="flex:1;background:var(--surface2);border-radius:8px;padding:10px 12px;text-align:center;border:1px solid var(--border)">
+      <div style="font-size:20px;font-weight:800;color:var(--text3)">${source.length}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:2px">total de origem</div>
+    </div>`;
+
+  // show conflict mode selector only if there are conflicts
+  const modeField=document.getElementById('dupConflictMode')?.closest('.field');
+  if(modeField) modeField.style.display=conflicts.length?'block':'none';
+
+  // list conflicting names
+  if(conflicts.length) {
+    const names=conflicts.map(r=>`${r.cliente}${r.tipo.length?' ('+r.tipo.join(', ')+')':''}`).join(', ');
+    showDupConflictInfo(conflicts.length, source.length, names);
+  }
+}
+
+function showDupConflictInfo(count, total, names) {
+  const el=document.getElementById('dupConflictInfo');
+  if(!el) return;
+  el.style.display='block';
+  el.innerHTML=`<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;color:#D97706"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <div><strong>${count} de ${total}</strong> já existe${count===1?'':'m'} no mês de destino:<br>
+    <span style="color:var(--text2);font-size:11px">${names}</span></div>`;
 }
 
 // ── Email templates ────────────────────────────────────────────────────────
@@ -1715,12 +1857,13 @@ function switchTab(tab) {
   document.querySelector('.table-wrap').style.display = tab==='main' ? '' : 'none';
   const qar = document.getElementById('quickAddRow');
   if (qar) qar.style.display = tab==='main' ? '' : 'none';
-  if (tab==='cliente') renderClienteView();
-  if (tab==='history') renderHistory();
-  if (tab==='prazos') renderPrazos();
-  if (tab==='trash') renderTrash();
-  if (tab==='kanban') { kanbanMes = activeMes; renderKanban(); }
-  if (tab==='tipos') renderTiposManager();
+  if (tab==='main') render();
+  else if (tab==='cliente') renderClienteView();
+  else if (tab==='history') renderHistory();
+  else if (tab==='prazos') renderPrazos();
+  else if (tab==='trash') renderTrash();
+  else if (tab==='kanban') { kanbanMes = activeMes; renderKanban(); }
+  else if (tab==='tipos') renderTiposManager();
 }
 
 // ── Client view ────────────────────────────────────────────────────────────────
