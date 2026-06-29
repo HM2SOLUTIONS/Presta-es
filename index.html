@@ -234,8 +234,8 @@ td.td-cliente { font-weight:600; font-size:14px; }
 @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
 
 /* ── Toast ── */
-.toast { position:fixed; bottom:24px; right:24px; background:var(--text); color:#fff; padding:12px 18px; border-radius:var(--radius-sm); font-size:13px; box-shadow:var(--shadow-lg); z-index:200; display:flex; align-items:center; gap:8px; transform:translateY(80px); opacity:0; transition:all .25s ease; max-width:320px; }
-.toast.show { transform:translateY(0); opacity:1; }
+.toast { position:fixed; bottom:24px; right:24px; background:var(--text); color:#fff; padding:12px 18px; border-radius:var(--radius-sm); font-size:13px; box-shadow:var(--shadow-lg); z-index:200; display:flex; align-items:center; gap:8px; transform:translateY(80px); opacity:0; transition:all .25s ease; max-width:400px; pointer-events:none; }
+.toast.show { transform:translateY(0); opacity:1; pointer-events:auto; }
 .toast.success { background:var(--green); }
 .toast.error { background:var(--red); }
 
@@ -462,9 +462,9 @@ tr:hover .hist-resend { opacity:1; }
       <div id="monthTabs" style="display:flex;align-items:center;flex:1;overflow-x:auto;scrollbar-width:none;padding:0 4px"></div>
     </div>
     <!-- Tipo filter bar -->
-    <div class="tipo-bar" id="tipoBar" style="display:none">
+    <div class="tipo-bar" id="tipoBar" style="display:none;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:10px;padding:0 2px">
       <span style="font-size:11px;color:var(--text3);flex-shrink:0">Tipo:</span>
-      <div id="tipoPills"></div>
+      <div id="tipoPills" style="display:flex;gap:5px;flex-wrap:wrap"></div>
     </div>
 
     <div class="toolbar">
@@ -505,12 +505,12 @@ tr:hover .hist-resend { opacity:1; }
         <thead>
           <tr>
             <th style="width:36px"><input type="checkbox" id="chkAll" onchange="toggleAll(this)"></th>
-            <th>Cliente</th>
-            <th>Estado</th>
+            <th data-sort="cliente" onclick="sortBy('cliente')" style="cursor:pointer;user-select:none;white-space:nowrap">Cliente <span class="sort-arrow" style="font-size:10px;color:var(--text3)">↕</span></th>
+            <th data-sort="status" onclick="sortBy('status')" style="cursor:pointer;user-select:none;white-space:nowrap">Estado <span class="sort-arrow" style="font-size:10px;color:var(--text3)">↕</span></th>
             <th>Nº</th>
-            <th>Tipo de tarefa</th>
-            <th>Prazo</th>
-            <th style="width:120px">Ações</th>
+            <th data-sort="tipo" onclick="sortBy('tipo')" style="cursor:pointer;user-select:none;white-space:nowrap">Tipo <span class="sort-arrow" style="font-size:10px;color:var(--text3)">↕</span></th>
+            <th data-sort="prazo" onclick="sortBy('prazo')" style="cursor:pointer;user-select:none;white-space:nowrap">Prazo <span class="sort-arrow" style="font-size:10px;color:var(--text3)">↕</span></th>
+            <th style="width:120px"></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -593,11 +593,10 @@ tr:hover .hist-resend { opacity:1; }
         <tbody id="trashBody"></tbody>
       </table>
     </div>
+  </div>
 
-
-    <!-- Tipos view -->
-    <!-- Tipos View (inside main) -->
-    <div id="tabTiposView" style="display:none">
+  <!-- Tipos view -->
+  <div id="tabTiposView" style="display:none">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
         <div>
           <div style="font-size:18px;font-weight:800">Tipos de Tarefa</div>
@@ -632,9 +631,7 @@ tr:hover .hist-resend { opacity:1; }
       <div class="tipo-section-label" style="margin-top:20px">Tipos base <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0">(sempre disponíveis)</span></div>
       <div class="tipo-manager-grid" id="baseTiposList"></div>
     </div>
-
   </div>
-</div>
 
 <!-- Cliente Modal -->
 <div class="overlay" id="clienteModal">
@@ -1045,7 +1042,7 @@ function renderMonths() {
 }
 
 
-function switchMonth(m) { activeMes = m; activeTipo = null; selected.clear(); render(); }
+function switchMonth(m) { activeMes = m; activeTipo = null; filterLate = false; sortCol = null; sortDir = 1; selected.clear(); render(); }
 
 // ── Stats ──────────────────────────────────────────────────────────────────
 function renderStats() {
@@ -1080,25 +1077,37 @@ function renderStats() {
 
 // ── Render ─────────────────────────────────────────────────────────────────
 function filtered() {
-  const q = document.getElementById('fSearch').value.toLowerCase();
+  const q = document.getElementById('fSearch').value.toLowerCase().trim();
   const st = document.getElementById('fStatus').value;
-  return data.filter(r =>
-    r.mes === activeMes &&
-    (!st || r.status === st) &&
-    (!q || r.cliente.toLowerCase().includes(q) || (r.tipo||[]).some(t=>t.toLowerCase().includes(q))) &&
-    (!activeTipo || (r.tipo||[]).includes(activeTipo))
-  );
+  const today = new Date(); today.setHours(0,0,0,0);
+  return data.filter(r => {
+    if (r.mes !== activeMes) return false;
+    if (st && r.status !== st) return false;
+    if (q && !r.cliente.toLowerCase().includes(q) && !(r.tipo||[]).some(t=>t.toLowerCase().includes(q))) return false;
+    if (activeTipo && !(r.tipo||[]).includes(activeTipo)) return false;
+    if (filterLate && !(r.prazo && new Date(r.prazo) < today && r.status !== 'Concluído')) return false;
+    return true;
+  });
 }
 
 function renderTipoFilter() {
-  const rows = data.filter(r => r.mes === activeMes);
-  const tipos = [...new Set(rows.flatMap(r => r.tipo||[]))].sort();
+  // base rows: filtered by mes + search + status (but NOT by activeTipo, so all types are visible)
+  const q = document.getElementById('fSearch').value.toLowerCase().trim();
+  const st = document.getElementById('fStatus').value;
+  const baseRows = data.filter(r => {
+    if (r.mes !== activeMes) return false;
+    if (st && r.status !== st) return false;
+    if (q && !r.cliente.toLowerCase().includes(q) && !(r.tipo||[]).some(t=>t.toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const tipos = [...new Set(baseRows.flatMap(r => r.tipo||[]))].sort();
   const bar = document.getElementById('tipoBar');
   if (!tipos.length) { bar.style.display='none'; return; }
   bar.style.display = 'flex';
-  let html = `<button class="tipo-pill ${activeTipo===null?'active':''}" onclick="setTipo(null)">Todos</button>`;
+  const totalCount = baseRows.length;
+  let html = `<button class="tipo-pill ${activeTipo===null?'active':''}" onclick="setTipo(null)">Todos <span style="font-size:10px;opacity:.75;margin-left:3px">${totalCount}</span></button>`;
   tipos.forEach(t => {
-    const cnt = rows.filter(r=>(r.tipo||[]).includes(t)).length;
+    const cnt = baseRows.filter(r=>(r.tipo||[]).includes(t)).length;
     const esc = t.replace(/'/g,"\'");
     html += `<button class="tipo-pill ${activeTipo===t?'active':''}" onclick="setTipo('${esc}')">${t}<span style="font-size:10px;opacity:.75;margin-left:3px">${cnt}</span></button>`;
   });
@@ -1129,14 +1138,15 @@ function statusBadge(s) {
 }
 
 function render() {
-  const rows = filtered();
+  const rows = filteredSorted();
   const allRows = data.filter(r => r.mes === activeMes);
-  const hasFilter = document.getElementById('fSearch').value || document.getElementById('fStatus').value || activeTipo;
+  const hasFilter = document.getElementById('fSearch').value || document.getElementById('fStatus').value || activeTipo || filterLate;
 
   if (!rows.length) {
+    const lateLabel = filterLate ? 'Nenhuma tarefa em atraso este mês ✓' : 'Sem resultados para o filtro ativo';
     const msg = hasFilter
-      ? `<div class="empty"><div class="empty-icon">🔍</div>Sem resultados<br><button class="btn btn-sm" style="margin-top:12px" onclick="clearFilters()">Limpar filtros</button></div>`
-      : `<div class="empty"><div class="empty-icon">📋</div>Sem entradas para este mês<br><span style="font-size:12px;color:var(--text3)">Use "+ Nova entrada" ou a linha de entrada rápida abaixo</span></div>`;
+      ? `<div class="empty"><div class="empty-icon">${filterLate?'✅':'🔍'}</div>${lateLabel}<br><button class="btn btn-sm" style="margin-top:12px" onclick="clearFilters()">Limpar filtros</button></div>`
+      : `<div class="empty"><div class="empty-icon">📋</div>Sem entradas para este mês<br><span style="font-size:12px;color:var(--text3)">Use "+ Nova tarefa" ou a linha de entrada rápida abaixo</span></div>`;
     document.getElementById('tbody').innerHTML = `<tr><td colspan="7">${msg}</td></tr>`;
   } else {
     document.getElementById('tbody').innerHTML = rows.map(r => {
@@ -1146,7 +1156,7 @@ function render() {
       else badge=`<span class="badge badge-ni" onclick="cycleStatus_id('${r.id}')" title="Clique para mudar">◎ Não iniciado</span>`;
 
       const tipoTags = (r.tipo||[]).map(t =>
-        `<span class="tag" style="cursor:pointer" onclick="setTipo('${t.replace(/'/g,"\'")}');" title="Filtrar por ${t}">${t}</span>`
+        `<span class="tag" style="cursor:pointer" onclick="setTipo(this.getAttribute('data-t'))" data-t="${t}" title="Filtrar: ${t}">${t}</span>`
       ).join('');
 
       return `<tr id="row-${r.id}">
@@ -1171,7 +1181,13 @@ function render() {
   }
 
   const fc = document.getElementById('filteredCount');
-  if (fc) fc.textContent = (hasFilter && rows.length !== allRows.length) ? `${rows.length} de ${allRows.length}` : '';
+  if (fc) {
+    let chips = [];
+    if (filterLate) chips.push('<span style="background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="clearFilters()">⚠ Em atraso ×</span>');
+    if (activeTipo) chips.push('<span style="background:var(--accent-l);color:var(--accent-d);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="setTipo(null)">'+activeTipo+' ×</span>');
+    const countText = hasFilter ? rows.length+' de '+allRows.length : '';
+    fc.innerHTML = chips.join('') + (countText ? '<span style="margin-left:6px;font-size:12px;color:var(--text3)">'+countText+'</span>' : '');
+  }
 
   renderStats();
   renderMonths();
@@ -1186,6 +1202,7 @@ function clearFilters() {
   document.getElementById('fSearch').value = '';
   document.getElementById('fStatus').value = '';
   activeTipo = null;
+  filterLate = false;
   render();
 }
 
@@ -1268,7 +1285,7 @@ async function saveEntry(){
     invalidateCache();
     render();
     renderProgressBar();
-    logActivity(entry.id||saved.id, cliente, editingId ? 'Entrada editada' : 'Entrada criada', (tipos||[]).join(', '));
+    logActivity(editingId||saved.id, cliente, editingId ? 'Entrada editada' : 'Entrada criada', (tipos||[]).join(', '));
     toast('Guardado no Notion ✓','success');
   } catch(e){ toast('Erro: '+e.message,'error'); }
   finally{ btn.disabled=false; btn.textContent='Guardar no Notion'; }
@@ -1279,22 +1296,24 @@ async function duplicateSingle(id) {
   const r = data.find(x=>x.id===id);
   if (!r) return;
   const toMes = nextMonthStr(r.mes);
-  if (!confirm(`Duplicar "${r.cliente}" para ${toMes}?`)) return;
-  try {
-    const props = {
-      'Cliente':{title:[{text:{content:r.cliente}}]},
-      'Status':{status:{name:'Não iniciado'}},
-      'Tipo de tarefa':{multi_select:(r.tipo||[]).map(n=>({name:n}))},
-      'Selecionar':{select:{name:toMes}},
-    };
-    if (r.n) props['Nº'] = {select:{name:r.n}};
-    if (r.prazo) props['Prazo'] = {date:{start:r.prazo}};
-    const saved = await notionReq('/v1/pages','POST',{parent:{database_id:DB_ID},properties:props});
-    data.push({id:saved.id,cliente:r.cliente,status:'Não iniciado',n:r.n,tipo:r.tipo,mes:toMes,prazo:r.prazo||null,url:saved.url});
-    logActivity(saved.id, r.cliente, 'Duplicado de '+r.mes, 'Para '+toMes);
-    toast(`"${r.cliente}" duplicado para ${toMes} ✓`,'success');
-    render();
-  } catch(e){ toast('Erro: '+e.message,'error'); }
+  confirmAction(`Duplicar "${r.cliente}"?`,`Será criada uma cópia para ${toMes} com estado "Não iniciado".`,'Duplicar', async()=>{
+    try {
+      const props = {
+        'Cliente':{title:[{text:{content:r.cliente}}]},
+        'Status':{status:{name:'Não iniciado'}},
+        'Tipo de tarefa':{multi_select:(r.tipo||[]).map(n=>({name:n}))},
+        'Selecionar':{select:{name:toMes}},
+      };
+      if (r.n) props['Nº'] = {select:{name:r.n}};
+      if (r.prazo) props['Prazo'] = {date:{start:r.prazo}};
+      const saved = await notionReq('/v1/pages','POST',{parent:{database_id:DB_ID},properties:props});
+      data.push({id:saved.id,cliente:r.cliente,status:'Não iniciado',n:r.n,tipo:r.tipo,mes:toMes,prazo:r.prazo||null,url:saved.url});
+      logActivity(saved.id, r.cliente, 'Duplicado de '+r.mes, 'Para '+toMes);
+      invalidateCache();
+      toast(`"${r.cliente}" duplicado para ${toMes} ✓`,'success');
+      render();
+    } catch(e){ toast('Erro: '+e.message,'error'); }
+  });
 }
 
 // ── Duplicate ──────────────────────────────────────────────────────────────
@@ -1355,89 +1374,253 @@ async function doDuplicate(){
   finally{ btn.disabled=false; btn.textContent='Duplicar no Notion →'; }
 }
 
-// ── Email ──────────────────────────────────────────────────────────────────
-function resetEmailModal(){
+// ── Email templates ────────────────────────────────────────────────────────
+const EMAIL_TEMPLATES_KEY = 'prestacoes_email_templates';
+
+const DEFAULT_TEMPLATES = [
+  { id:'iva', name:'IVA', tipos:['IVA'],
+    subject:'Declaração IVA — {mes} — {cliente}',
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar que foi submetida a declaração periódica de IVA referente ao período de {mes}.\n\n{detalhes}\n\nFicamos ao dispor para qualquer esclarecimento.\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'irc', name:'IRC', tipos:['IRC 2024','IRC 2025'],
+    subject:'Declaração IRC — {mes} — {cliente}',
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar que foi processada a declaração de IRC.\n\n{detalhes}\n\nFicamos ao dispor para qualquer esclarecimento.\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'ss', name:'Seg. Social', tipos:['SS ADV'],
+    subject:'Contribuições SS — {mes} — {cliente}',
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar o valor das contribuições para a Segurança Social referentes ao mês de {mes}.\n\n{detalhes}\n\nO prazo de pagamento é até ao dia 20 do mês seguinte.\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'dmr', name:'DMR', tipos:['DMR'],
+    subject:'Declaração Mensal de Remunerações — {mes} — {cliente}',
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar que foi submetida a DMR referente ao mês de {mes}.\n\n{detalhes}\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'irs', name:'IRS', tipos:['Prestação IRS 2024','Prestação IRS 2025','RENT IRS'],
+    subject:'Prestação IRS — {mes} — {cliente}',
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar o valor da prestação de IRS referente ao período de {mes}.\n\n{detalhes}\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'geral', name:'Geral', tipos:[],
+    subject:'Prestação de contas — {mes} — {cliente}',
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio enviar a informação referente às seguintes obrigações fiscais:\n\n{detalhes}\n\nCom os melhores cumprimentos,\n{assinatura}' },
+];
+
+function loadEmailTemplates() {
+  try { const s=JSON.parse(localStorage.getItem(EMAIL_TEMPLATES_KEY)||'null'); if(s&&Array.isArray(s))return s; } catch(e){}
+  return DEFAULT_TEMPLATES.map(t=>({...t}));
+}
+function saveEmailTemplates(t) { localStorage.setItem(EMAIL_TEMPLATES_KEY,JSON.stringify(t)); }
+function getAssinatura() { return localStorage.getItem('prestacoes_assinatura')||''; }
+function saveAssinatura(v) { localStorage.setItem('prestacoes_assinatura',v); }
+
+function detectTemplate(tipos) {
+  const tpls=loadEmailTemplates();
+  if(!tipos||!tipos.length) return tpls.find(t=>t.id==='geral')||tpls[0];
+  for(const t of tpls){ if(t.tipos&&t.tipos.some(tt=>tipos.includes(tt))) return t; }
+  return tpls.find(t=>t.id==='geral')||tpls[0];
+}
+
+function buildBodyFromTemplate(tpl,rows,cliente,mes) {
+  const detalhes=rows.map(r=>{
+    let l='  \u2022 '+(r.tipo||[]).join(', ');
+    if(r.prazo) l+=' \u2014 prazo: '+new Date(r.prazo).toLocaleDateString('pt-PT',{day:'2-digit',month:'long',year:'numeric'});
+    return l;
+  }).join('\n');
+  return (tpl.body||'')
+    .replace(/\{cliente\}/g,cliente).replace(/\{mes\}/g,mes)
+    .replace(/\{detalhes\}/g,detalhes).replace(/\{assinatura\}/g,getAssinatura());
+}
+function buildSubjectFromTemplate(tpl,cliente,mes) {
+  return (tpl.subject||'').replace(/\{cliente\}/g,cliente).replace(/\{mes\}/g,mes);
+}
+
+let currentEmailRows=[];
+
+function resetEmailModal() {
   attachedFiles=[];
   renderAttachList();
-  document.getElementById('fileInput').value='';
-  document.getElementById('attachNote').style.display='none';
+  const fi=document.getElementById('fileInput'); if(fi) fi.value='';
+  const an=document.getElementById('attachNote'); if(an) an.style.display='none';
+  switchEmailTab('edit');
+  updateBodyCount();
 }
 
-function buildBody(rows){
-  const linhas=rows.map(r=>`  • ${r.cliente} — ${(r.tipo||[]).join(', ')}${r.prazo?' (prazo: '+new Date(r.prazo).toLocaleDateString('pt-PT')+')'  :''}`).join('\n');
-  return `Exmo(a). Senhor(a),\n\nVenho por este meio enviar a informação referente à(s) seguinte(s) prestação(ões):\n\n${linhas}\n\nCaso necessite de alguma informação adicional, não hesite em contactar.\n\nCom os melhores cumprimentos,`;
-}
-
-function openEmail(id){
-  const r=data.find(x=>x.id===id);
+function openEmail(id) {
+  const r=data.find(x=>x.id===id); if(!r) return;
+  currentEmailRows=[r];
   resetEmailModal();
+  const tpl=detectTemplate(r.tipo||[]);
+  const clients=loadClients();
+  const cc=(clients[r.cliente]||{}).cc||'';
   document.getElementById('eTo').value=emailsMap[r.cliente]||'';
-  document.getElementById('eCc').value='';
-  document.getElementById('eSubj').value=`Prestação de contas — ${r.mes} — ${r.cliente}`;
-  document.getElementById('eBody').value=buildBody([r]);
+  document.getElementById('eCc').value=cc;
+  document.getElementById('eSubj').value=buildSubjectFromTemplate(tpl,r.cliente,r.mes);
+  document.getElementById('eBody').value=buildBodyFromTemplate(tpl,[r],r.cliente,r.mes);
+  const sub=document.getElementById('emailModalSubtitle'); if(sub) sub.textContent=r.cliente+' \u00b7 '+r.mes;
+  renderTemplateQuickBar(r.tipo||[]);
   document.getElementById('emailModal').classList.add('open');
+  setTimeout(()=>document.getElementById('eTo').focus(),120);
 }
 
-function openEmailSel(){
-  const rows=data.filter(r=>selected.has(r.id));
-  if(!rows.length) return;
+function openEmailSel() {
+  const rows=data.filter(r=>selected.has(r.id)); if(!rows.length) return;
+  currentEmailRows=rows;
   resetEmailModal();
   const emails=[...new Set(rows.map(r=>emailsMap[r.cliente]).filter(Boolean))];
-  document.getElementById('eTo').value=emails.join(', ');
+  const tipos=[...new Set(rows.flatMap(r=>r.tipo||[]))];
+  const tpl=detectTemplate(tipos);
+  const cliente=rows.length===1?rows[0].cliente:rows.length+' clientes';
+  document.getElementById('eTo').value=emails.join('; ');
   document.getElementById('eCc').value='';
-  document.getElementById('eSubj').value=`Prestações de contas — ${activeMes}`;
-  document.getElementById('eBody').value=buildBody(rows);
+  document.getElementById('eSubj').value=buildSubjectFromTemplate(tpl,cliente,activeMes);
+  document.getElementById('eBody').value=buildBodyFromTemplate(tpl,rows,cliente,activeMes);
+  const sub=document.getElementById('emailModalSubtitle'); if(sub) sub.textContent=rows.length+' tarefa(s) selecionada(s)';
+  renderTemplateQuickBar(tipos);
   document.getElementById('emailModal').classList.add('open');
 }
 
-function doSendEmail(){
-  const to=document.getElementById('eTo').value;
-  const cc=document.getElementById('eCc').value;
-  const subjRaw=document.getElementById('eSubj').value;
-  const subj=encodeURIComponent(subjRaw);
-  const body=encodeURIComponent(document.getElementById('eBody').value);
-  let mailto=`mailto:${to}?subject=${subj}&body=${body}`;
-  if(cc) mailto+=`&cc=${encodeURIComponent(cc)}`;
-  window.location.href = mailto;
-  // save to history
-  const rows = selected.size>0 ? data.filter(r=>selected.has(r.id)) : [];
-  const clientes = rows.length ? rows.map(r=>r.cliente) : [to];
-  saveEmailToHistory(to, subjRaw, clientes, activeMes);
-  if(attachedFiles.length) toast(`Email aberto — anexe os ${attachedFiles.length} ficheiro(s) manualmente`,'success');
-  else toast('Email aberto no cliente de correio','success');
-  closeModal('emailModal');
-  selected.clear(); render();
+function renderTemplateQuickBar(tiposAtivos) {
+  const bar=document.getElementById('templateQuickBar'); if(!bar) return;
+  const tpls=loadEmailTemplates();
+  bar.innerHTML='<span style="font-size:11px;color:var(--text3);flex-shrink:0;align-self:center">Template:</span>'+
+    tpls.map(t=>{
+      const active=t.tipos&&t.tipos.length?t.tipos.some(tt=>tiposAtivos.includes(tt)):!tiposAtivos.length;
+      return '<button class="template-pill '+(active?'active':'')+'" onclick="applyTemplate(\''+t.id+'\')">'+t.name+'</button>';
+    }).join('');
 }
 
-function copyEmailText(){
-  const text=`Para: ${document.getElementById('eTo').value}\nAssunto: ${document.getElementById('eSubj').value}\n\n${document.getElementById('eBody').value}`;
-  navigator.clipboard.writeText(text).then(()=>toast('Texto copiado ✓','success'));
+function applyTemplate(id) {
+  const tpls=loadEmailTemplates(), tpl=tpls.find(t=>t.id===id);
+  if(!tpl||!currentEmailRows.length) return;
+  const r=currentEmailRows[0];
+  const cliente=currentEmailRows.length===1?r.cliente:currentEmailRows.length+' clientes';
+  const mes=r.mes||activeMes;
+  document.getElementById('eSubj').value=buildSubjectFromTemplate(tpl,cliente,mes);
+  document.getElementById('eBody').value=buildBodyFromTemplate(tpl,currentEmailRows,cliente,mes);
+  document.querySelectorAll('.template-pill').forEach(el=>el.classList.toggle('active',el.textContent.trim()===tpl.name));
+  refreshEmailPreview(); updateBodyCount();
+  toast('Template "'+tpl.name+'" aplicado','success');
+}
+
+function switchEmailTab(tab) {
+  const panes={edit:'emailEditPane',preview:'emailPreviewPane',templates:'emailTemplatesPaneX'};
+  const btns={edit:'etabEdit',preview:'etabPreview',templates:'etabTemplates'};
+  Object.keys(panes).forEach(t=>{
+    const p=document.getElementById(panes[t]); if(p) p.style.display=t===tab?'block':'none';
+    const b=document.getElementById(btns[t]); if(b) b.classList.toggle('active',t===tab);
+  });
+  if(tab==='preview') refreshEmailPreview();
+  if(tab==='templates') renderTemplatesManager();
+}
+
+function refreshEmailPreview() {
+  const to=document.getElementById('eTo').value, cc=document.getElementById('eCc').value;
+  const subj=document.getElementById('eSubj').value, body=document.getElementById('eBody').value;
+  const pvTo=document.getElementById('pvTo'); if(pvTo) pvTo.textContent=to||'(sem destinat\u00e1rio)';
+  const pvCcRow=document.getElementById('pvCcRow'), pvCcEl=document.getElementById('pvCc');
+  if(pvCcRow&&pvCcEl){pvCcEl.textContent=cc; pvCcRow.style.display=cc?'flex':'none';}
+  const pvSubj=document.getElementById('pvSubj'); if(pvSubj) pvSubj.textContent=subj;
+  const pvBody=document.getElementById('pvBody'); if(pvBody) pvBody.textContent=body;
+  const pvAr=document.getElementById('pvAttachRow');
+  if(pvAr){pvAr.style.display=attachedFiles.length?'block':'none'; if(attachedFiles.length) pvAr.textContent='\uD83D\uDCCE '+attachedFiles.map(f=>f.name).join(', ');}
+}
+
+function updateBodyCount() {
+  const el=document.getElementById('eBodyCount'), body=document.getElementById('eBody');
+  if(el&&body) el.textContent=body.value.length+' caracteres';
+}
+
+function buildMailto() {
+  const to=document.getElementById('eTo').value, cc=document.getElementById('eCc').value;
+  const subj=encodeURIComponent(document.getElementById('eSubj').value);
+  const body=encodeURIComponent(document.getElementById('eBody').value);
+  let url='mailto:'+encodeURIComponent(to)+'?subject='+subj+'&body='+body;
+  if(cc) url+='&cc='+encodeURIComponent(cc);
+  return url;
+}
+
+function doSendEmail(via) {
+  const to=document.getElementById('eTo').value;
+  const subjRaw=document.getElementById('eSubj').value;
+  const bodyText=document.getElementById('eBody').value;
+  if(via==='gmail') {
+    window.open('https://mail.google.com/mail/?view=cm&to='+encodeURIComponent(to)+'&su='+encodeURIComponent(subjRaw)+'&body='+encodeURIComponent(bodyText),'_blank');
+  } else {
+    window.location.href=buildMailto();
+  }
+  const clientes=currentEmailRows.length?currentEmailRows.map(r=>r.cliente):[to];
+  saveEmailToHistory(to,subjRaw,bodyText,clientes,activeMes);
+  toast(attachedFiles.length?'Email aberto \u2014 anexe '+attachedFiles.length+' ficheiro(s)':'Email aberto \u2713','success');
+  closeModal('emailModal'); selected.clear(); render();
+}
+
+function sendViaOutlookDesktop() {
+  const to=document.getElementById('eTo').value;
+  const subjRaw=document.getElementById('eSubj').value;
+  const bodyText=document.getElementById('eBody').value;
+  window.location.href='ms-outlook://compose?to='+encodeURIComponent(to)+'&subject='+encodeURIComponent(subjRaw)+'&body='+encodeURIComponent(bodyText);
+  const clientes=currentEmailRows.length?currentEmailRows.map(r=>r.cliente):[to];
+  saveEmailToHistory(to,subjRaw,bodyText,clientes,activeMes);
+  toast('A abrir Outlook desktop\u2026','success');
+  closeModal('emailModal'); selected.clear(); render();
+}
+
+function copyEmailText() {
+  const to=document.getElementById('eTo').value;
+  const subj=document.getElementById('eSubj').value;
+  const body=document.getElementById('eBody').value;
+  navigator.clipboard.writeText('Para: '+to+'\nAssunto: '+subj+'\n\n'+body)
+    .then(()=>toast('Copiado para a \u00e1rea de transfer\u00eancia \u2713','success'));
+}
+
+function renderTemplatesManager() {
+  const tpls=loadEmailTemplates();
+  const el=document.getElementById('templatesList'); if(!el) return;
+  el.innerHTML=tpls.map((t,i)=>'<div style="border:1.5px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border)">'+
+    '<div style="display:flex;align-items:center;gap:8px">'+
+    '<input type="text" value="'+t.name+'" onchange="updateTemplateName('+i+',this.value)" style="font-weight:700;font-size:13px;border:none;background:transparent;outline:none;color:var(--text);width:140px;font-family:\'Inter\',sans-serif">'+
+    '<span style="font-size:11px;color:var(--text3)">'+(t.tipos&&t.tipos.length?t.tipos.join(', '):'(tipo geral)')+'</span></div>'+
+    '<div style="display:flex;gap:4px">'+
+    '<button class="btn btn-sm" onclick="applyTemplate(\''+t.id+'\');switchEmailTab(\'edit\')">Usar agora</button>'+
+    (!DEFAULT_TEMPLATES.find(d=>d.id===t.id)?'<button class="btn btn-sm btn-danger" onclick="deleteTemplate('+i+')">✕</button>':'')+
+    '</div></div>'+
+    '<div style="padding:10px 14px">'+
+    '<div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Assunto</div>'+
+    '<input type="text" value="'+t.subject.replace(/"/g,'&quot;')+'" onchange="updateTemplateSubject('+i+',this.value)" style="width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 8px;font-size:12px;margin-bottom:8px;font-family:\'Inter\',sans-serif;background:var(--surface);color:var(--text)">'+
+    '<div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Corpo <span style="font-weight:400;text-transform:none">(var\u00e1veis: {cliente}, {mes}, {detalhes}, {assinatura})</span></div>'+
+    '<textarea onchange="updateTemplateBody('+i+',this.value)" style="width:100%;border:1px solid var(--border);border-radius:5px;padding:8px;font-size:12px;min-height:90px;resize:vertical;font-family:\'Inter\',sans-serif;background:var(--surface);color:var(--text)">'+t.body+'</textarea>'+
+    '</div></div>').join('')+
+  '<div style="padding:14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--radius-sm)">'+
+  '<div style="font-size:12px;font-weight:600;margin-bottom:8px">Assinatura (aparece no final de todos os emails)</div>'+
+  '<textarea onchange="saveAssinatura(this.value)" style="width:100%;border:1px solid var(--border);border-radius:5px;padding:8px;font-size:12px;min-height:56px;resize:vertical;font-family:\'Inter\',sans-serif;background:var(--surface);color:var(--text)" placeholder="Ex: Jo\u00e3o Silva&#10;Contabilidade Silva &amp; Associados&#10;Tel: 210 000 000">'+getAssinatura()+'</textarea></div>';
+}
+
+function updateTemplateName(i,v){const t=loadEmailTemplates();t[i].name=v;saveEmailTemplates(t);}
+function updateTemplateSubject(i,v){const t=loadEmailTemplates();t[i].subject=v;saveEmailTemplates(t);}
+function updateTemplateBody(i,v){const t=loadEmailTemplates();t[i].body=v;saveEmailTemplates(t);}
+function deleteTemplate(i){confirmAction('Apagar template?','N\u00e3o pode ser desfeito.','Apagar',()=>{const t=loadEmailTemplates();t.splice(i,1);saveEmailTemplates(t);renderTemplatesManager();});}
+function addEmailTemplate(){
+  const t=loadEmailTemplates();
+  t.push({id:'custom_'+Date.now(),name:'Novo template',tipos:[],subject:'Assunto \u2014 {mes} \u2014 {cliente}',body:'Exmo(a). Sr(a). {cliente},\n\n{detalhes}\n\nCom os melhores cumprimentos,\n{assinatura}'});
+  saveEmailTemplates(t);renderTemplatesManager();
 }
 
 function handleFiles(files){
-  [...files].forEach(f=>{ if(!attachedFiles.find(x=>x.name===f.name&&x.size===f.size)) attachedFiles.push(f); });
+  [...files].forEach(f=>{if(!attachedFiles.find(x=>x.name===f.name&&x.size===f.size))attachedFiles.push(f);});
   renderAttachList();
-  document.getElementById('attachNote').style.display=attachedFiles.length?'block':'none';
+  const an=document.getElementById('attachNote'); if(an) an.style.display=attachedFiles.length?'block':'none';
 }
-
 function handleDrop(e){
   e.preventDefault();
   document.getElementById('dropZone').style.borderColor='var(--border)';
   document.getElementById('dropZone').style.background='';
   handleFiles(e.dataTransfer.files);
 }
-
 function renderAttachList(){
-  const icons={pdf:'📄',xls:'📊',xlsx:'📊',doc:'📝',docx:'📝',jpg:'🖼',jpeg:'🖼',png:'🖼'};
-  document.getElementById('attachList').innerHTML=attachedFiles.map((f,i)=>`
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
-      <span style="font-size:12px;display:flex;align-items:center;gap:6px">
-        ${icons[f.name.split('.').pop().toLowerCase()]||'📎'} ${f.name}
-        <span style="color:var(--text3)">(${(f.size/1024).toFixed(0)} KB)</span>
-      </span>
-      <button class="btn btn-sm btn-icon btn-danger" onclick="attachedFiles.splice(${i},1);renderAttachList()" style="border:none">✕</button>
-    </div>`).join('');
+  const icons={pdf:'\uD83D\uDCC4',xls:'\uD83D\uDCCA',xlsx:'\uD83D\uDCCA',doc:'\uD83D\uDCDD',docx:'\uD83D\uDCDD',jpg:'\uD83D\uDDBC',jpeg:'\uD83D\uDDBC',png:'\uD83D\uDDBC'};
+  const el=document.getElementById('attachList'); if(!el) return;
+  el.innerHTML=attachedFiles.map((f,i)=>
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">'+
+    '<span style="font-size:12px;display:flex;align-items:center;gap:6px">'+(icons[f.name.split('.').pop().toLowerCase()]||'\uD83D\uDCCE')+' '+f.name+
+    ' <span style="color:var(--text3)">('+((f.size/1024).toFixed(0))+' KB)</span></span>'+
+    '<button class="btn btn-sm btn-icon btn-danger" onclick="attachedFiles.splice('+i+',1);renderAttachList()" style="border:none">\u2715</button></div>'
+  ).join('');
 }
+
 
 // ── Sync indicator ─────────────────────────────────────────────────────────
 function setSyncing(v){
@@ -1453,8 +1636,10 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySele
 let toastTimer;
 function toast(msg,type=''){
   const t=document.getElementById('toast');
-  t.textContent=msg; t.className='toast show'+(type?' '+type:'');
-  clearTimeout(toastTimer);
+  t.innerHTML=''; t.textContent=msg;
+  t.className='toast show'+(type?' '+type:'');
+  t._undoCb=null;
+  clearTimeout(toastTimer); clearTimeout(undoTimer);
   toastTimer=setTimeout(()=>t.classList.remove('show'),3500);
 }
 
@@ -1463,63 +1648,57 @@ function quickFilter(status) {
   switchTab('main');
   document.getElementById('fStatus').value = status;
   document.getElementById('fSearch').value = '';
+  activeTipo = null;
+  filterLate = false;
   render();
-  if (status) toast('A mostrar: ' + (status||'todas'), 'success');
 }
 
+let filterLate = false;
 function quickFilterLate() {
   switchTab('main');
   document.getElementById('fStatus').value = '';
   document.getElementById('fSearch').value = '';
-  // filter late manually
-  const today = new Date();
-  const rows = data.filter(r => r.mes === activeMes && r.prazo && new Date(r.prazo) < today && r.status !== 'Concluído');
-  const tbody = document.getElementById('tbody');
-  if (!rows.length) { toast('Sem tarefas em atraso', 'success'); render(); return; }
-  tbody.innerHTML = rows.map(r => `
-    <tr style="background:var(--red-bg)">
-      <td><input type="checkbox" ${selected.has(r.id)?'checked':''} onchange="toggleSel('${r.id}',this)"></td>
-      <td style="font-weight:500">${r.cliente}</td>
-      <td><span onclick="cycleStatus('${r.id}')" style="cursor:pointer">${statusBadge(r.status)}</span></td>
-      <td style="font-family:var(--mono);color:var(--text2)">${r.n||'—'}</td>
-      <td>${(r.tipo||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
-      <td>${prazoDisplay(r.prazo)}</td>
-      <td><div style="display:flex;gap:4px">
-        <button class="btn btn-sm btn-icon" onclick="openEmail('${r.id}')" title="Email">✉</button>
-        <button class="btn btn-sm btn-icon" onclick="openEdit('${r.id}')" title="Editar">✏</button>
-      </div></td>
-    </tr>`).join('');
-  toast(`${rows.length} tarefa(s) em atraso`, 'success');
+  activeTipo = null;
+  filterLate = true;
+  render();
+  const count = data.filter(r => r.mes===activeMes && r.prazo && new Date(r.prazo)<new Date() && r.status!=='Concluído').length;
+  if (!count) toast('Sem tarefas em atraso ✓', 'success');
+  else toast(`${count} tarefa(s) em atraso`, 'error');
 }
 
 // ── Bulk status ────────────────────────────────────────────────────────────────
 async function bulkChangeStatus(newStatus) {
   if (!newStatus || !selected.size) { document.getElementById('bulkStatus').value=''; return; }
   const ids = [...selected];
-  const confirm_msg = `Mudar ${ids.length} tarefa(s) para "${newStatus}"?`;
-  if (!confirm(confirm_msg)) { document.getElementById('bulkStatus').value=''; return; }
-  
-  let done = 0;
-  for (const id of ids) {
-    try {
-      await notionReq('/v1/pages/'+id,'PATCH',{properties:{Status:{status:{name:newStatus}}}});
-      const r = data.find(x=>x.id===id);
-      if (r) r.status = newStatus;
-      done++;
-    } catch(e) { console.error(e); }
-  }
   document.getElementById('bulkStatus').value = '';
-  selected.clear();
-  render();
-  renderProgressBar();
-  toast(`${done} tarefa(s) atualizadas para "${newStatus}"`, 'success');
+  confirmAction(
+    `Mudar ${ids.length} tarefa(s)?`,
+    `O estado de ${ids.length} tarefa(s) selecionada(s) será alterado para "${newStatus}" no Notion.`,
+    'Confirmar',
+    async () => {
+      let done = 0;
+      for (const id of ids) {
+        try {
+          await notionReq('/v1/pages/'+id,'PATCH',{properties:{Status:{status:{name:newStatus}}}});
+          const r = data.find(x=>x.id===id);
+          if (r) { logActivity(id, r.cliente, 'Estado em lote', r.status+' → '+newStatus); r.status = newStatus; }
+          done++;
+        } catch(e) { console.error(e); }
+      }
+      selected.clear();
+      invalidateCache();
+      render();
+      renderProgressBar();
+      toast(`${done} tarefa(s) → "${newStatus}" ✓`, 'success');
+    }
+  );
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 let currentTab = 'main';
 
 function switchTab(tab) {
-  if(tab !== 'main') activeTipo = null;
+  if(tab !== 'main') { activeTipo = null; filterLate = false; }
   currentTab = tab;
   document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
   const activeBtn = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
@@ -1531,7 +1710,7 @@ function switchTab(tab) {
   document.getElementById('tabTrashView').style.display = tab==='trash' ? 'block' : 'none';
   document.getElementById('tabKanbanView').style.display = tab==='kanban' ? 'block' : 'none';
   document.getElementById('tabTiposView').style.display = tab==='tipos' ? 'block' : 'none';
-  const mainEls = ['stats','monthNavBar','toolbar','selBar','progressBar','tipoBar'];
+  const mainEls = ['stats','monthNavBar','toolbar','selBar','progressBarWrap','tipoBar'];
   mainEls.forEach(id => { const el=document.getElementById(id); if(el) el.style.display = tab==='main' ? '' : 'none'; });
   document.querySelector('.table-wrap').style.display = tab==='main' ? '' : 'none';
   const qar = document.getElementById('quickAddRow');
@@ -1540,7 +1719,7 @@ function switchTab(tab) {
   if (tab==='history') renderHistory();
   if (tab==='prazos') renderPrazos();
   if (tab==='trash') renderTrash();
-  if (tab==='kanban') renderKanban();
+  if (tab==='kanban') { kanbanMes = activeMes; renderKanban(); }
   if (tab==='tipos') renderTiposManager();
 }
 
@@ -1709,9 +1888,9 @@ function loadHistory() {
   emailHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
 }
 
-function saveEmailToHistory(to, subj, clientes, mes) {
+function saveEmailToHistory(to, subj, bodyText, clientes, mes) {
   loadHistory();
-  emailHistory.unshift({ date: new Date().toISOString(), to, subj, clientes, mes });
+  emailHistory.unshift({ id: Date.now(), date: new Date().toISOString(), to, subj, body: bodyText, clientes, mes });
   if (emailHistory.length > 100) emailHistory = emailHistory.slice(0, 100);
   localStorage.setItem(HISTORY_KEY, JSON.stringify(emailHistory));
 }
@@ -1734,15 +1913,20 @@ function renderHistory() {
 }
 
 function resendEmail(id) {
-  const h=emailHistory.find(x=>x.id===id);if(!h)return;
+  loadHistory();
+  const h=emailHistory.find(x=>String(x.id)===String(id));if(!h)return;
+  currentEmailRows=[];
   resetEmailModal();
   document.getElementById('eTo').value=h.to||'';
+  document.getElementById('eCc').value='';
   document.getElementById('eSubj').value=h.subj||'';
-  document.getElementById('eBody').value='';
+  document.getElementById('eBody').value=h.body||'';
+  const sub=document.getElementById('emailModalSubtitle');
+  if(sub) sub.textContent='Reenvio — '+new Date(h.date).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',year:'numeric'});
+  renderTemplateQuickBar([]);
   document.getElementById('emailModal').classList.add('open');
 }
 
-// ── Prazos view ────────────────────────────────────────────────────────────────
 function renderPrazos() {
   const today = new Date();
   const year = today.getFullYear();
@@ -1858,7 +2042,7 @@ function startEditTipo(nome, isBase) {
   input.select();
 }
 
-function saveTipoRename(oldName, inputEl) {
+async function saveTipoRename(oldName, inputEl) {
   const newName = inputEl.value.trim();
   const itemEl = inputEl.closest('.tipo-item');
   if (!newName || newName === oldName) {
@@ -1869,18 +2053,28 @@ function saveTipoRename(oldName, inputEl) {
     toast('"' + newName + '" já existe', 'error');
     inputEl.focus(); return;
   }
-  // Update custom tipos list
+  // Update local custom tipos list
   const custom = getCustomTipos().map(t => t === oldName ? newName : t);
   saveCustomTipos(custom);
-  // Update all data entries in memory
-  const count = data.filter(r => (r.tipo||[]).includes(oldName)).length;
-  data.forEach(r => {
-    if (r.tipo) r.tipo = r.tipo.map(t => t === oldName ? newName : t);
-  });
+  // Find affected tasks
+  const affected = data.filter(r => (r.tipo||[]).includes(oldName));
+  // Update memory
+  data.forEach(r => { if (r.tipo) r.tipo = r.tipo.map(t => t === oldName ? newName : t); });
   invalidateCache();
   renderTiposManager();
-  if (count > 0) toast(`"${oldName}" → "${newName}" · ${count} tarefa(s) atualizadas ✓`, 'success');
-  else toast(`Renomeado para "${newName}" ✓`, 'success');
+  if (affected.length > 0) {
+    toast(`"${oldName}" → "${newName}" · a atualizar ${affected.length} tarefa(s) no Notion…`, '');
+    let updated = 0;
+    for (const r of affected) {
+      try {
+        await notionReq('/v1/pages/'+r.id,'PATCH',{properties:{'Tipo de tarefa':{multi_select:r.tipo.map(n=>({name:n}))}}});
+        updated++;
+      } catch(e) { console.error('Erro ao atualizar '+r.cliente, e); }
+    }
+    toast(`"${oldName}" → "${newName}" · ${updated}/${affected.length} tarefa(s) atualizadas no Notion ✓`, 'success');
+  } else {
+    toast(`Renomeado para "${newName}" ✓`, 'success');
+  }
 }
 
 function cancelTipoRename(itemEl, oldName, inputEl) {
@@ -1894,17 +2088,28 @@ function cancelTipoRename(itemEl, oldName, inputEl) {
 function deleteTipo(nome) {
   const usage = getTipoUsage(nome);
   const msg = usage > 0
-    ? `"${nome}" está em uso em ${usage} tarefa(s). Será removido dessas tarefas também.`
-    : `"${nome}" não tem tarefas associadas.`;
-  confirmAction('Apagar tipo?', msg, 'Apagar', () => {
+    ? `"${nome}" está em uso em ${usage} tarefa(s). Será removido dessas tarefas e atualizado no Notion.`
+    : `"${nome}" não tem tarefas associadas. Pode apagar com segurança.`;
+  confirmAction('Apagar tipo?', msg, 'Apagar', async () => {
     const custom = getCustomTipos().filter(t => t !== nome);
     saveCustomTipos(custom);
-    if (usage > 0) {
-      data.forEach(r => { if (r.tipo) r.tipo = r.tipo.filter(t => t !== nome); });
-      invalidateCache();
-    }
+    const affected = data.filter(r => (r.tipo||[]).includes(nome));
+    data.forEach(r => { if (r.tipo) r.tipo = r.tipo.filter(t => t !== nome); });
+    invalidateCache();
     renderTiposManager();
-    toast('"' + nome + '" apagado ✓', 'success');
+    if (affected.length > 0) {
+      toast(`A remover "${nome}" de ${affected.length} tarefa(s) no Notion…`, '');
+      let updated = 0;
+      for (const r of affected) {
+        try {
+          await notionReq('/v1/pages/'+r.id,'PATCH',{properties:{'Tipo de tarefa':{multi_select:r.tipo.map(n=>({name:n}))}}});
+          updated++;
+        } catch(e) { console.error(e); }
+      }
+      toast(`"${nome}" removido de ${updated} tarefa(s) no Notion ✓`, 'success');
+    } else {
+      toast('"' + nome + '" apagado ✓', 'success');
+    }
   });
 }
 
@@ -2101,6 +2306,7 @@ let kanbanMes = null;
 
 function renderKanbanMonthTabs() {
   const months = getMonths();
+  // Sempre sincroniza com activeMes quando entra no kanban
   if (!kanbanMes || !months.includes(kanbanMes)) kanbanMes = activeMes || months[0];
   document.getElementById('kanbanMonthTabs').innerHTML = months.map(m => `
     <button onclick="kanbanMes='${m}';renderKanban()" 
@@ -2326,6 +2532,144 @@ function selectCliente(nome) {
   if (c.tipos && c.tipos.length) {
     buildTipoCheckboxes(c.tipos);
   }
+}
+
+// ── Trash ─────────────────────────────────────────────────────────────────────
+function loadTrash() { return JSON.parse(localStorage.getItem(TRASH_KEY)||'[]'); }
+function saveTrash(t) { localStorage.setItem(TRASH_KEY,JSON.stringify(t)); updateTrashCount(); }
+function updateTrashCount() {
+  const n = loadTrash().length;
+  const el = document.getElementById('trashCount');
+  if (el) { el.style.display=n>0?'inline':'none'; el.textContent=n; }
+}
+
+// ── Undo toast ────────────────────────────────────────────────────────────────
+let undoTimer;
+function showUndoToast(msg, undoCb) {
+  const t = document.getElementById('toast');
+  t.innerHTML = `${msg} <button onclick="doUndo()" style="margin-left:10px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;padding:2px 10px;border-radius:5px;cursor:pointer;font-size:12px;font-family:Inter,sans-serif">Desfazer</button>`;
+  t.className = 'toast show';
+  t._undoCb = undoCb;
+  clearTimeout(undoTimer);
+  undoTimer = setTimeout(() => { t.classList.remove('show'); t._undoCb = null; }, 5000);
+}
+function doUndo() {
+  const t = document.getElementById('toast');
+  if (t._undoCb) { t._undoCb(); t._undoCb = null; }
+  t.classList.remove('show');
+  clearTimeout(undoTimer);
+}
+
+// ── Delete row ────────────────────────────────────────────────────────────────
+async function deleteRow(id) {
+  const r = data.find(x=>x.id===id);
+  if (!r) return;
+  confirmAction(
+    'Mover para o lixo?',
+    `"${r.cliente}" será arquivado. Pode recuperar no separador Lixo ou desfazer imediatamente.`,
+    'Mover',
+    async () => {
+      try {
+        await notionReq('/v1/pages/'+id,'PATCH',{archived:true});
+        const trash = loadTrash();
+        trash.unshift({...r, deletedAt: new Date().toISOString()});
+        saveTrash(trash);
+        data = data.filter(x=>x.id!==id);
+        selected.delete(id);
+        invalidateCache();
+        render();
+        showUndoToast(`"${r.cliente}" movido para o lixo`, () => restoreFromTrash(id));
+      } catch(e) { toast('Erro ao apagar: '+e.message,'error'); }
+    }
+  );
+}
+
+async function restoreFromTrash(id) {
+  const trash = loadTrash();
+  const r = trash.find(x=>x.id===id);
+  if (!r) return;
+  try {
+    await notionReq('/v1/pages/'+id,'PATCH',{archived:false});
+    data.push({...r, deletedAt:undefined});
+    saveTrash(trash.filter(x=>x.id!==id));
+    invalidateCache();
+    render();
+    if (currentTab==='trash') renderTrash();
+    toast(`"${r.cliente}" recuperado ✓`,'success');
+  } catch(e) { toast('Erro ao recuperar: '+e.message,'error'); }
+}
+
+async function deleteFromTrash(id) {
+  confirmAction('Apagar definitivamente?','Esta ação não pode ser desfeita.','Apagar', () => {
+    saveTrash(loadTrash().filter(x=>x.id!==id));
+    renderTrash();
+    toast('Apagado definitivamente','success');
+  });
+}
+
+function emptyTrash() {
+  confirmAction('Esvaziar o lixo?',`${loadTrash().length} entradas serão apagadas definitivamente.`,'Esvaziar', () => {
+    saveTrash([]);
+    renderTrash();
+    toast('Lixo esvaziado ✓','success');
+  });
+}
+
+function renderTrash() {
+  const trash = loadTrash();
+  const tbody = document.getElementById('trashBody');
+  if (!tbody) return;
+  if (!trash.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="empty-icon">🗑</div>Lixo vazio</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = trash.map(r => `<tr>
+    <td style="font-weight:600">${r.cliente}</td>
+    <td>${(r.tipo||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
+    <td style="font-family:var(--mono);font-size:12px">${r.mes||'—'}</td>
+    <td style="font-size:12px">${r.prazo?new Date(r.prazo).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'}):'—'}</td>
+    <td style="font-size:12px;color:var(--text2)">${r.deletedAt?new Date(r.deletedAt).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'—'}</td>
+    <td><div style="display:flex;gap:4px">
+      <button class="btn btn-sm" onclick="restoreFromTrash('${r.id}')">↩ Recuperar</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteFromTrash('${r.id}')">✕</button>
+    </div></td>
+  </tr>`).join('');
+}
+
+// ── Column sorting ─────────────────────────────────────────────────────────────
+let sortCol = null;
+let sortDir = 1; // 1 asc, -1 desc
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  // update header arrows
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = th.dataset.sort === col ? (sortDir===1?' ↑':' ↓') : ' ↕';
+  });
+  render();
+}
+
+function filteredSorted() {
+  let rows = filtered();
+  if (!sortCol) return rows;
+  return [...rows].sort((a,b) => {
+    let va, vb;
+    if (sortCol==='cliente') { va=a.cliente.toLowerCase(); vb=b.cliente.toLowerCase(); }
+    else if (sortCol==='status') {
+      const order={'Não iniciado':0,'Em andamento':1,'Concluído':2};
+      va=order[a.status]??0; vb=order[b.status]??0;
+    }
+    else if (sortCol==='prazo') {
+      va=a.prazo?new Date(a.prazo).getTime():Infinity;
+      vb=b.prazo?new Date(b.prazo).getTime():Infinity;
+    }
+    else if (sortCol==='tipo') { va=(a.tipo||[]).join(',').toLowerCase(); vb=(b.tipo||[]).join(',').toLowerCase(); }
+    if (va<vb) return -1*sortDir;
+    if (va>vb) return 1*sortDir;
+    return 0;
+  });
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────────
