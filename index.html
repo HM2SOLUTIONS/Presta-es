@@ -375,9 +375,10 @@ tr:hover .hist-resend { opacity:1; }
       <label>Integration Key (do Notion)</label>
       <input type="password" id="tokenInput" placeholder="ntn_xxxxxxxxxxxxxxxx" style="width:100%;font-family:var(--mono)">
     </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="connectNotion()">
+    <button class="btn btn-primary" id="connectBtn" style="width:100%;justify-content:center;height:44px;font-size:14px;font-weight:600" onclick="connectNotion()">
       Ligar ao Notion →
     </button>
+    </div><!-- /setupForm -->
     <div id="setupError" style="display:none;margin-top:12px;padding:10px;background:var(--red-bg);border-radius:6px;font-size:13px;color:var(--red)"></div>
   </div>
 </div>
@@ -912,24 +913,68 @@ async function notionReq(path, method='GET', body=null) {
 async function connectNotion() {
   const t = document.getElementById('tokenInput').value.trim();
   const w = document.getElementById('workerInput').value.trim();
-  if (!t || !w) { 
-    document.getElementById('setupError').style.display = 'block';
-    document.getElementById('setupError').textContent = 'Preencha o Worker URL e a Integration Key.';
-    return; 
+  const errEl = document.getElementById('setupError');
+  const btn = document.getElementById('connectBtn');
+
+  errEl.style.display = 'none';
+
+  if (!t || !w) {
+    errEl.style.display = 'block';
+    errEl.innerHTML = '⚠️ Preencha os dois campos antes de ligar.';
+    return;
   }
+
+  // Validate URL format
+  if (!w.startsWith('http')) {
+    errEl.style.display = 'block';
+    errEl.innerHTML = '⚠️ O Worker URL deve começar por <code>https://</code>';
+    return;
+  }
+
+  // Validate key format
+  if (!t.startsWith('ntn_') && !t.startsWith('secret_')) {
+    errEl.style.display = 'block';
+    errEl.innerHTML = '⚠️ A Integration Key deve começar por <code>ntn_</code> ou <code>secret_</code>';
+    return;
+  }
+
   token = t;
-  WORKER_URL = w;
+  WORKER_URL = w.replace(/\/$/, ''); // remove trailing slash
+
+  if (btn) { btn.disabled = true; btn.textContent = 'A ligar…'; }
+  const form = document.getElementById('setupForm');
+  const connecting = document.getElementById('setupConnecting');
+  if (form) form.style.opacity = '0.5';
+  if (connecting) connecting.style.display = 'block';
+
   try {
+    // Test connection
     await notionReq('/v1/databases/' + DB_ID);
     localStorage.setItem(TOKEN_KEY, t);
-    localStorage.setItem('prestacoes_worker_url', w);
+    localStorage.setItem('prestacoes_worker_url', WORKER_URL);
     emailsMap = JSON.parse(localStorage.getItem(EMAILS_KEY) || '{}');
     showApp();
     await loadData();
   } catch(e) {
-    setSyncing(false);
-    document.getElementById('setupError').style.display = 'block';
-    document.getElementById('setupError').textContent = 'Erro: ' + e.message + '. Verifique o Worker URL, a key e se adicionou a integração à database.';
+    token = ''; WORKER_URL = '';
+    errEl.style.display = 'block';
+    // Give specific error guidance
+    let msg = e.message || 'Erro desconhecido';
+    let hint = '';
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('fetch')) {
+      hint = '<br><br>💡 <strong>Possível causa:</strong> O Worker URL não está correcto ou o Worker não está activo. Verifique em <a href="https://dash.cloudflare.com" target="_blank" style="color:var(--accent)">dash.cloudflare.com</a> se o Worker está deployed.';
+    } else if (msg.includes('401') || msg.includes('unauthorized') || msg.toLowerCase().includes('api token')) {
+      hint = '<br><br>💡 <strong>Possível causa:</strong> A Integration Key está incorrecta. Copie-a novamente de <a href="https://notion.so/profile/integrations" target="_blank" style="color:var(--accent)">notion.so/profile/integrations</a>.';
+    } else if (msg.includes('404') || msg.includes('not found')) {
+      hint = '<br><br>💡 <strong>Possível causa:</strong> A database não foi partilhada com a integração. Na database do Notion, clique em <strong>⋯ → Connections → adicionar a sua integração</strong>.';
+    } else if (msg.includes('CORS') || msg.includes('cors')) {
+      hint = '<br><br>💡 <strong>Possível causa:</strong> O Worker não tem o código correcto. Certifique-se que copiou o ficheiro <code>worker.js</code> completo.';
+    }
+    errEl.innerHTML = '❌ <strong>Erro ao ligar:</strong> ' + msg + hint;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Ligar ao Notion →'; }
+    if (form) form.style.opacity = '1';
+    if (connecting) connecting.style.display = 'none';
   }
 }
 
@@ -1766,8 +1811,10 @@ function renderAttachList(){
 
 // ── Sync indicator ─────────────────────────────────────────────────────────
 function setSyncing(v){
-  document.getElementById('syncDot').className='sync-dot'+(v?' syncing':'');
-  document.getElementById('syncLabel').textContent=v?'A sincronizar…':'Sincronizado';
+  const dot=document.getElementById('syncDot');
+  const lbl=document.getElementById('syncLabel');
+  if(dot) dot.className='sync-dot'+(v?' syncing':'');
+  if(lbl) lbl.textContent=v?'A sincronizar…':'Sincronizado';
 }
 
 // ── Utils ──────────────────────────────────────────────────────────────────
