@@ -369,17 +369,16 @@ tr:hover .hist-resend { opacity:1; }
     </div>
     <div class="field">
       <label>Worker URL (do Cloudflare)</label>
-      <input type="text" id="workerInput" placeholder="https://xxx.workers.dev" style="width:100%;font-family:var(--mono)">
+      <input type="text" id="workerInput" placeholder="https://xxx.workers.dev" style="width:100%;font-family:var(--mono)" onkeydown="if(event.key==='Enter')connectNotion()">
     </div>
     <div class="field">
       <label>Integration Key (do Notion)</label>
-      <input type="password" id="tokenInput" placeholder="ntn_xxxxxxxxxxxxxxxx" style="width:100%;font-family:var(--mono)">
+      <input type="password" id="tokenInput" placeholder="ntn_xxxxxxxxxxxxxxxx" style="width:100%;font-family:var(--mono)" onkeydown="if(event.key==='Enter')connectNotion()">
     </div>
     <button class="btn btn-primary" id="connectBtn" style="width:100%;justify-content:center;height:44px;font-size:14px;font-weight:600" onclick="connectNotion()">
       Ligar ao Notion →
     </button>
-    </div><!-- /setupForm -->
-    <div id="setupError" style="display:none;margin-top:12px;padding:10px;background:var(--red-bg);border-radius:6px;font-size:13px;color:var(--red)"></div>
+    <div id="setupError" style="display:none;margin-top:14px;padding:12px 14px;background:var(--red-bg);border:1px solid #FCA5A5;border-radius:8px;font-size:13px;color:var(--red);line-height:1.6"></div>
   </div>
 </div>
 
@@ -942,10 +941,8 @@ async function connectNotion() {
   WORKER_URL = w.replace(/\/$/, ''); // remove trailing slash
 
   if (btn) { btn.disabled = true; btn.textContent = 'A ligar…'; }
-  const form = document.getElementById('setupForm');
-  const connecting = document.getElementById('setupConnecting');
-  if (form) form.style.opacity = '0.5';
-  if (connecting) connecting.style.display = 'block';
+  const setupCard = document.querySelector('.setup-card');
+  if (setupCard) setupCard.style.opacity = '0.7';
 
   try {
     // Test connection
@@ -973,8 +970,7 @@ async function connectNotion() {
     errEl.innerHTML = '❌ <strong>Erro ao ligar:</strong> ' + msg + hint;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Ligar ao Notion →'; }
-    if (form) form.style.opacity = '1';
-    if (connecting) connecting.style.display = 'none';
+    if (document.querySelector('.setup-card')) document.querySelector('.setup-card').style.opacity = '1';
   }
 }
 
