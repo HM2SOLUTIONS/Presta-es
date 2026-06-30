@@ -1243,8 +1243,8 @@ function render() {
     const qVal = document.getElementById('fSearch').value.trim();
     let chips = [];
     if (filterLate) chips.push('<span style="background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="clearFilters()">⚠ Em atraso ×</span>');
-    if (stVal) chips.push('<span style="background:var(--accent-l);color:var(--accent-d);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="document.getElementById('fStatus').value='';render()">'+stVal+' ×</span>');
-    if (qVal) chips.push('<span style="background:var(--surface2);color:var(--text2);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="document.getElementById('fSearch').value='';render()">"'+qVal+'" ×</span>');
+    if (stVal) chips.push('<span style="background:var(--accent-l);color:var(--accent-d);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="document.getElementById(\'fStatus\').value=\'\';render()">'+stVal+' ×</span>');
+    if (qVal) chips.push('<span style="background:var(--surface2);color:var(--text2);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="document.getElementById(\'fSearch\').value=\'\';render()">"'+qVal+'" ×</span>');
     if (activeTipo) chips.push('<span style="background:var(--accent-l);color:var(--accent-d);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer" onclick="setTipo(null)">'+activeTipo+' ×</span>');
     const countText = hasFilter ? rows.length+' de '+allRows.length : '';
     const clearBtn = document.getElementById('clearFiltersBtn');
