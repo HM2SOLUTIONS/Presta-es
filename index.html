@@ -180,6 +180,12 @@ td.td-cliente { font-weight:600; font-size:14px; }
 .status-select.ni { background:var(--yellow-bg); color:var(--yellow); }
 .status-select.em { background:var(--accent-l); color:var(--accent-d); }
 .status-select.ok { background:var(--green-bg); color:var(--green); }
+.status-clickable { cursor:pointer; user-select:none; transition:opacity var(--transition); }
+.status-clickable:hover { opacity:.8; }
+#statusPicker { position:fixed; z-index:500; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow-lg); padding:6px; min-width:170px; }
+.status-picker-opt { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500; transition:background var(--transition); }
+.status-picker-opt:hover { background:var(--surface2); }
+.status-picker-opt .dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
 
 .tag { display:inline-block; padding:2px 7px; border-radius:5px; font-size:11px; background:var(--surface2); color:var(--text2); border:1px solid var(--border); margin:1px; font-family:var(--mono); font-weight:500; }
 
@@ -438,7 +444,13 @@ tr:hover .hist-resend { opacity:1; }
     </div>
   </div>
 
-  <div class="main">
+  <!-- Offline banner -->
+<div id="offlineBanner" style="display:none;background:#FEF0EE;border-bottom:1px solid #F5C6C2;padding:8px 24px;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:var(--red)">
+  <span id="offlineBannerMsg"></span>
+  <button class="btn btn-sm" onclick="loadData()" style="color:var(--red);border-color:var(--red)">Tentar novamente</button>
+</div>
+
+<div class="main">
     <div class="stats" id="stats"></div>
     <!-- Progress bar -->
     <div id="progressBar" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;box-shadow:var(--shadow);display:none">
@@ -833,6 +845,23 @@ tr:hover .hist-resend { opacity:1; }
 
 <div class="toast" id="toast"></div>
 
+<!-- Status Picker Popup -->
+<div id="statusPicker" style="display:none">
+  <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding:4px 12px 6px">Mudar estado</div>
+  <div class="status-picker-opt" onclick="applyStatusPicker('Não iniciado')">
+    <div class="dot" style="background:var(--yellow)"></div>
+    <span>◎ Não iniciado</span>
+  </div>
+  <div class="status-picker-opt" onclick="applyStatusPicker('Em andamento')">
+    <div class="dot" style="background:var(--accent)"></div>
+    <span>↻ Em andamento</span>
+  </div>
+  <div class="status-picker-opt" onclick="applyStatusPicker('Concluído')">
+    <div class="dot" style="background:var(--green)"></div>
+    <span>✓ Concluído</span>
+  </div>
+</div>
+
 <script>
 // ── Constants ──────────────────────────────────────────────────────────────
 const DB_ID = '29696dd2e40880a3b7afcc80a77b3de6';
@@ -880,11 +909,19 @@ function closeConfirm() { document.getElementById('confirmOverlay').classList.re
 
 // ── Proxy helper ───────────────────────────────────────────────────────────
 // Notion API blocks CORS from browsers, so we use a public CORS proxy
-// WORKER_URL é preenchido automaticamente após criar o Cloudflare Worker
+// ── Notion connection ─────────────────────────────────────────────────────────
 let WORKER_URL = localStorage.getItem('prestacoes_worker_url') || '';
 
-async function notionReq(path, method='GET', body=null) {
+// Sync queue for retrying failed requests
+const syncQueue = [];
+let isSyncingQueue = false;
+
+async function notionReq(path, method='GET', body=null, retries=3) {
   if (!WORKER_URL) throw new Error('Worker URL não configurado');
+  if (!navigator.onLine) {
+    setConnectionState('offline');
+    throw new Error('Sem ligação à internet');
+  }
   setSyncing(true);
   const url = WORKER_URL.replace(/\/$/, '') + path;
   const opts = {
@@ -896,19 +933,67 @@ async function notionReq(path, method='GET', body=null) {
     }
   };
   if (body) opts.body = JSON.stringify(body);
-  try {
-    const res = await fetch(url, opts);
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.message || 'Erro Notion API');
-    setSyncing(false);
-    return json;
-  } catch(e) {
-    setSyncing(false);
-    throw e;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, opts);
+      const json = await res.json();
+      if (!res.ok) {
+        const msg = json.message || json.code || 'Erro Notion API';
+        if (res.status === 401) { setConnectionState('auth_error'); throw new Error('Token inválido — verifique a Integration Key'); }
+        if (res.status === 404) throw new Error('Página não encontrada no Notion');
+        if (res.status >= 500 && attempt < retries) {
+          await new Promise(r => setTimeout(r, 800 * attempt));
+          continue;
+        }
+        throw new Error(msg);
+      }
+      setSyncing(false);
+      setConnectionState('ok');
+      return json;
+    } catch(e) {
+      if (attempt === retries) {
+        setSyncing(false);
+        if (e.message.includes('fetch') || e.message.includes('network')) {
+          setConnectionState('error');
+          throw new Error('Sem ligação ao servidor. Verifique o Worker URL.');
+        }
+        throw e;
+      }
+      await new Promise(r => setTimeout(r, 600 * attempt));
+    }
   }
 }
 
-// ── Setup ──────────────────────────────────────────────────────────────────
+// Connection state indicator
+function setConnectionState(state) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  const banner = document.getElementById('offlineBanner');
+  if (!dot) return;
+  const states = {
+    ok:         { color: '#0F9B6E', label: '', banner: false },
+    syncing:    { color: '#D97706', label: 'A sincronizar…', banner: false },
+    error:      { color: '#C0392B', label: 'Erro de ligação', banner: true },
+    offline:    { color: '#C0392B', label: 'Offline', banner: true },
+    auth_error: { color: '#C0392B', label: 'Token inválido', banner: true },
+  };
+  const s = states[state] || states.ok;
+  dot.style.background = s.color;
+  dot.classList.toggle('syncing', state === 'syncing');
+  if (lbl) lbl.textContent = s.label;
+  if (banner) banner.style.display = s.banner ? 'flex' : 'none';
+  if (banner && s.banner) {
+    const msgs = { error: '⚠ Erro de ligação ao Notion. A tentar novamente…', offline: '📡 Sem internet. As alterações serão guardadas quando voltar a ligar.', auth_error: '🔑 Token inválido. Por favor re-ligue o Notion.' };
+    document.getElementById('offlineBannerMsg').textContent = msgs[state] || '';
+  }
+}
+
+// Online/offline listeners
+window.addEventListener('online', () => { setConnectionState('ok'); toast('Ligação restaurada ✓', 'success'); loadData(true); });
+window.addEventListener('offline', () => setConnectionState('offline'));
+
+
 async function connectNotion() {
   const t = document.getElementById('tokenInput').value.trim();
   const w = document.getElementById('workerInput').value.trim();
@@ -1208,9 +1293,9 @@ function render() {
   } else {
     document.getElementById('tbody').innerHTML = rows.map(r => {
       let badge;
-      if (r.status==='Concluído') badge=`<span class="badge badge-ok" onclick="cycleStatus_id('${r.id}')" title="Clique para mudar">✓ Concluído</span>`;
-      else if (r.status==='Em andamento') badge=`<span class="badge badge-em" onclick="cycleStatus_id('${r.id}')" title="Clique para mudar">↻ Em andamento</span>`;
-      else badge=`<span class="badge badge-ni" onclick="cycleStatus_id('${r.id}')" title="Clique para mudar">◎ Não iniciado</span>`;
+      if (r.status==='Concluído') badge=`<span class="badge badge-ok status-clickable" onclick="openStatusPicker(event,'${r.id}')" title="Clique para mudar estado">✓ Concluído ▾</span>`;
+      else if (r.status==='Em andamento') badge=`<span class="badge badge-em status-clickable" onclick="openStatusPicker(event,'${r.id}')" title="Clique para mudar estado">↻ Em andamento ▾</span>`;
+      else badge=`<span class="badge badge-ni status-clickable" onclick="openStatusPicker(event,'${r.id}')" title="Clique para mudar estado">◎ Não iniciado ▾</span>`;
 
       const tipoTags = (r.tipo||[]).map(t =>
         `<span class="tag" style="cursor:pointer" onclick="setTipo(this.getAttribute('data-t'))" data-t="${t}" title="Filtrar: ${t}">${t}</span>`
@@ -1268,6 +1353,56 @@ function clearFilters() {
   filterLate = false;
   render();
 }
+
+// ── Status picker popup ───────────────────────────────────────────────────────
+let statusPickerId = null;
+
+function openStatusPicker(e, id) {
+  e.stopPropagation();
+  statusPickerId = id;
+  const picker = document.getElementById('statusPicker');
+  picker.style.display = 'block';
+  const rect = e.target.getBoundingClientRect();
+  let top = rect.bottom + 4;
+  let left = rect.left;
+  // keep in viewport
+  if (left + 180 > window.innerWidth) left = window.innerWidth - 185;
+  if (top + 160 > window.innerHeight) top = rect.top - 160;
+  picker.style.top = top + 'px';
+  picker.style.left = left + 'px';
+}
+
+async function applyStatusPicker(newStatus) {
+  document.getElementById('statusPicker').style.display = 'none';
+  if (!statusPickerId) return;
+  const id = statusPickerId;
+  statusPickerId = null;
+  const r = data.find(x => x.id === id);
+  if (!r || r.status === newStatus) return;
+  const oldStatus = r.status;
+  r.status = newStatus;
+  render();
+  renderProgressBar();
+  setRowSaving(id, true);
+  try {
+    await notionReq('/v1/pages/'+id, 'PATCH', {properties:{Status:{status:{name:newStatus}}}});
+    logActivity(id, r.cliente, 'Estado alterado', `${oldStatus} → ${newStatus}`);
+    setRowSaving(id, false);
+    toast(`${r.cliente} → ${newStatus}`, 'success');
+  } catch(e) {
+    r.status = oldStatus;
+    render();
+    renderProgressBar();
+    setRowSaving(id, false);
+    toast('Erro: ' + e.message, 'error');
+  }
+}
+
+// Close picker on outside click
+document.addEventListener('click', e => {
+  const picker = document.getElementById('statusPicker');
+  if (picker && !picker.contains(e.target)) picker.style.display = 'none';
+});
 
 async function cycleStatus_id(id) {
   const r = data.find(x=>x.id===id); if(!r) return;
@@ -1806,12 +1941,7 @@ function renderAttachList(){
 
 
 // ── Sync indicator ─────────────────────────────────────────────────────────
-function setSyncing(v){
-  const dot=document.getElementById('syncDot');
-  const lbl=document.getElementById('syncLabel');
-  if(dot) dot.className='sync-dot'+(v?' syncing':'');
-  if(lbl) lbl.textContent=v?'A sincronizar…':'Sincronizado';
-}
+function setSyncing(v){ setConnectionState(v ? 'syncing' : 'ok'); }
 
 // ── Utils ──────────────────────────────────────────────────────────────────
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
