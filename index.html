@@ -180,12 +180,6 @@ td.td-cliente { font-weight:600; font-size:14px; }
 .status-select.ni { background:var(--yellow-bg); color:var(--yellow); }
 .status-select.em { background:var(--accent-l); color:var(--accent-d); }
 .status-select.ok { background:var(--green-bg); color:var(--green); }
-.status-clickable { cursor:pointer; user-select:none; transition:opacity var(--transition); }
-.status-clickable:hover { opacity:.8; }
-#statusPicker { position:fixed; z-index:500; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow-lg); padding:6px; min-width:170px; }
-.status-picker-opt { display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500; transition:background var(--transition); }
-.status-picker-opt:hover { background:var(--surface2); }
-.status-picker-opt .dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
 
 .tag { display:inline-block; padding:2px 7px; border-radius:5px; font-size:11px; background:var(--surface2); color:var(--text2); border:1px solid var(--border); margin:1px; font-family:var(--mono); font-weight:500; }
 
@@ -444,13 +438,7 @@ tr:hover .hist-resend { opacity:1; }
     </div>
   </div>
 
-  <!-- Offline banner -->
-<div id="offlineBanner" style="display:none;background:#FEF0EE;border-bottom:1px solid #F5C6C2;padding:8px 24px;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:var(--red)">
-  <span id="offlineBannerMsg"></span>
-  <button class="btn btn-sm" onclick="loadData()" style="color:var(--red);border-color:var(--red)">Tentar novamente</button>
-</div>
-
-<div class="main">
+  <div class="main">
     <div class="stats" id="stats"></div>
     <!-- Progress bar -->
     <div id="progressBar" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;box-shadow:var(--shadow);display:none">
@@ -754,12 +742,21 @@ tr:hover .hist-resend { opacity:1; }
         <button class="email-tab" id="etabPreview" onclick="switchEmailTab('preview')">👁 Pré-visualizar</button>
       </div>
       <div id="emailEditPane">
+        <!-- Template quick bar -->
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm)" id="templateQuickBar"></div>
+        <div id="templateHint" style="display:none;font-size:11px;color:var(--green);background:var(--green-bg);padding:5px 10px;border-radius:5px;margin-bottom:10px"></div>
         <div class="grid-2">
           <div class="field"><label>Para</label><input id="eTo" type="email" placeholder="cliente@email.com" oninput="refreshEmailPreview()"></div>
           <div class="field"><label>CC (opcional)</label><input id="eCc" type="email" oninput="refreshEmailPreview()"></div>
         </div>
         <div class="field"><label>Assunto</label><input id="eSubj" type="text" oninput="refreshEmailPreview()"></div>
-        <div class="field"><label>Mensagem</label><textarea id="eBody" oninput="refreshEmailPreview()"></textarea></div>
+        <div class="field">
+          <label style="display:flex;align-items:center;justify-content:space-between">
+            Mensagem
+            <span id="eBodyCount" style="font-size:11px;color:var(--text3);font-weight:400"></span>
+          </label>
+          <textarea id="eBody" oninput="refreshEmailPreview();updateBodyCount()"></textarea>
+        </div>
         <div class="field">
           <label>Anexos</label>
           <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()"
@@ -845,23 +842,6 @@ tr:hover .hist-resend { opacity:1; }
 
 <div class="toast" id="toast"></div>
 
-<!-- Status Picker Popup -->
-<div id="statusPicker" style="display:none">
-  <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding:4px 12px 6px">Mudar estado</div>
-  <div class="status-picker-opt" onclick="applyStatusPicker('Não iniciado')">
-    <div class="dot" style="background:var(--yellow)"></div>
-    <span>◎ Não iniciado</span>
-  </div>
-  <div class="status-picker-opt" onclick="applyStatusPicker('Em andamento')">
-    <div class="dot" style="background:var(--accent)"></div>
-    <span>↻ Em andamento</span>
-  </div>
-  <div class="status-picker-opt" onclick="applyStatusPicker('Concluído')">
-    <div class="dot" style="background:var(--green)"></div>
-    <span>✓ Concluído</span>
-  </div>
-</div>
-
 <script>
 // ── Constants ──────────────────────────────────────────────────────────────
 const DB_ID = '29696dd2e40880a3b7afcc80a77b3de6';
@@ -909,19 +889,11 @@ function closeConfirm() { document.getElementById('confirmOverlay').classList.re
 
 // ── Proxy helper ───────────────────────────────────────────────────────────
 // Notion API blocks CORS from browsers, so we use a public CORS proxy
-// ── Notion connection ─────────────────────────────────────────────────────────
+// WORKER_URL é preenchido automaticamente após criar o Cloudflare Worker
 let WORKER_URL = localStorage.getItem('prestacoes_worker_url') || '';
 
-// Sync queue for retrying failed requests
-const syncQueue = [];
-let isSyncingQueue = false;
-
-async function notionReq(path, method='GET', body=null, retries=3) {
+async function notionReq(path, method='GET', body=null) {
   if (!WORKER_URL) throw new Error('Worker URL não configurado');
-  if (!navigator.onLine) {
-    setConnectionState('offline');
-    throw new Error('Sem ligação à internet');
-  }
   setSyncing(true);
   const url = WORKER_URL.replace(/\/$/, '') + path;
   const opts = {
@@ -933,67 +905,19 @@ async function notionReq(path, method='GET', body=null, retries=3) {
     }
   };
   if (body) opts.body = JSON.stringify(body);
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(url, opts);
-      const json = await res.json();
-      if (!res.ok) {
-        const msg = json.message || json.code || 'Erro Notion API';
-        if (res.status === 401) { setConnectionState('auth_error'); throw new Error('Token inválido — verifique a Integration Key'); }
-        if (res.status === 404) throw new Error('Página não encontrada no Notion');
-        if (res.status >= 500 && attempt < retries) {
-          await new Promise(r => setTimeout(r, 800 * attempt));
-          continue;
-        }
-        throw new Error(msg);
-      }
-      setSyncing(false);
-      setConnectionState('ok');
-      return json;
-    } catch(e) {
-      if (attempt === retries) {
-        setSyncing(false);
-        if (e.message.includes('fetch') || e.message.includes('network')) {
-          setConnectionState('error');
-          throw new Error('Sem ligação ao servidor. Verifique o Worker URL.');
-        }
-        throw e;
-      }
-      await new Promise(r => setTimeout(r, 600 * attempt));
-    }
+  try {
+    const res = await fetch(url, opts);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'Erro Notion API');
+    setSyncing(false);
+    return json;
+  } catch(e) {
+    setSyncing(false);
+    throw e;
   }
 }
 
-// Connection state indicator
-function setConnectionState(state) {
-  const dot = document.getElementById('syncDot');
-  const lbl = document.getElementById('syncLabel');
-  const banner = document.getElementById('offlineBanner');
-  if (!dot) return;
-  const states = {
-    ok:         { color: '#0F9B6E', label: '', banner: false },
-    syncing:    { color: '#D97706', label: 'A sincronizar…', banner: false },
-    error:      { color: '#C0392B', label: 'Erro de ligação', banner: true },
-    offline:    { color: '#C0392B', label: 'Offline', banner: true },
-    auth_error: { color: '#C0392B', label: 'Token inválido', banner: true },
-  };
-  const s = states[state] || states.ok;
-  dot.style.background = s.color;
-  dot.classList.toggle('syncing', state === 'syncing');
-  if (lbl) lbl.textContent = s.label;
-  if (banner) banner.style.display = s.banner ? 'flex' : 'none';
-  if (banner && s.banner) {
-    const msgs = { error: '⚠ Erro de ligação ao Notion. A tentar novamente…', offline: '📡 Sem internet. As alterações serão guardadas quando voltar a ligar.', auth_error: '🔑 Token inválido. Por favor re-ligue o Notion.' };
-    document.getElementById('offlineBannerMsg').textContent = msgs[state] || '';
-  }
-}
-
-// Online/offline listeners
-window.addEventListener('online', () => { setConnectionState('ok'); toast('Ligação restaurada ✓', 'success'); loadData(true); });
-window.addEventListener('offline', () => setConnectionState('offline'));
-
-
+// ── Setup ──────────────────────────────────────────────────────────────────
 async function connectNotion() {
   const t = document.getElementById('tokenInput').value.trim();
   const w = document.getElementById('workerInput').value.trim();
@@ -1293,9 +1217,9 @@ function render() {
   } else {
     document.getElementById('tbody').innerHTML = rows.map(r => {
       let badge;
-      if (r.status==='Concluído') badge=`<span class="badge badge-ok status-clickable" onclick="openStatusPicker(event,'${r.id}')" title="Clique para mudar estado">✓ Concluído ▾</span>`;
-      else if (r.status==='Em andamento') badge=`<span class="badge badge-em status-clickable" onclick="openStatusPicker(event,'${r.id}')" title="Clique para mudar estado">↻ Em andamento ▾</span>`;
-      else badge=`<span class="badge badge-ni status-clickable" onclick="openStatusPicker(event,'${r.id}')" title="Clique para mudar estado">◎ Não iniciado ▾</span>`;
+      if (r.status==='Concluído') badge=`<span class="badge badge-ok" onclick="cycleStatus_id('${r.id}')" title="Clique para mudar">✓ Concluído</span>`;
+      else if (r.status==='Em andamento') badge=`<span class="badge badge-em" onclick="cycleStatus_id('${r.id}')" title="Clique para mudar">↻ Em andamento</span>`;
+      else badge=`<span class="badge badge-ni" onclick="cycleStatus_id('${r.id}')" title="Clique para mudar">◎ Não iniciado</span>`;
 
       const tipoTags = (r.tipo||[]).map(t =>
         `<span class="tag" style="cursor:pointer" onclick="setTipo(this.getAttribute('data-t'))" data-t="${t}" title="Filtrar: ${t}">${t}</span>`
@@ -1353,56 +1277,6 @@ function clearFilters() {
   filterLate = false;
   render();
 }
-
-// ── Status picker popup ───────────────────────────────────────────────────────
-let statusPickerId = null;
-
-function openStatusPicker(e, id) {
-  e.stopPropagation();
-  statusPickerId = id;
-  const picker = document.getElementById('statusPicker');
-  picker.style.display = 'block';
-  const rect = e.target.getBoundingClientRect();
-  let top = rect.bottom + 4;
-  let left = rect.left;
-  // keep in viewport
-  if (left + 180 > window.innerWidth) left = window.innerWidth - 185;
-  if (top + 160 > window.innerHeight) top = rect.top - 160;
-  picker.style.top = top + 'px';
-  picker.style.left = left + 'px';
-}
-
-async function applyStatusPicker(newStatus) {
-  document.getElementById('statusPicker').style.display = 'none';
-  if (!statusPickerId) return;
-  const id = statusPickerId;
-  statusPickerId = null;
-  const r = data.find(x => x.id === id);
-  if (!r || r.status === newStatus) return;
-  const oldStatus = r.status;
-  r.status = newStatus;
-  render();
-  renderProgressBar();
-  setRowSaving(id, true);
-  try {
-    await notionReq('/v1/pages/'+id, 'PATCH', {properties:{Status:{status:{name:newStatus}}}});
-    logActivity(id, r.cliente, 'Estado alterado', `${oldStatus} → ${newStatus}`);
-    setRowSaving(id, false);
-    toast(`${r.cliente} → ${newStatus}`, 'success');
-  } catch(e) {
-    r.status = oldStatus;
-    render();
-    renderProgressBar();
-    setRowSaving(id, false);
-    toast('Erro: ' + e.message, 'error');
-  }
-}
-
-// Close picker on outside click
-document.addEventListener('click', e => {
-  const picker = document.getElementById('statusPicker');
-  if (picker && !picker.contains(e.target)) picker.style.display = 'none';
-});
 
 async function cycleStatus_id(id) {
   const r = data.find(x=>x.id===id); if(!r) return;
@@ -1696,24 +1570,30 @@ function showDupConflictInfo(count, total, names) {
 const EMAIL_TEMPLATES_KEY = 'prestacoes_email_templates';
 
 const DEFAULT_TEMPLATES = [
-  { id:'iva', name:'IVA', tipos:['IVA'],
+  { id:'iva', name:'IVA', tipos:['IVA'], priority:10,
     subject:'Declaração IVA — {mes} — {cliente}',
-    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar que foi submetida a declaração periódica de IVA referente ao período de {mes}.\n\n{detalhes}\n\nFicamos ao dispor para qualquer esclarecimento.\n\nCom os melhores cumprimentos,\n{assinatura}' },
-  { id:'irc', name:'IRC', tipos:['IRC 2024','IRC 2025'],
-    subject:'Declaração IRC — {mes} — {cliente}',
-    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar que foi processada a declaração de IRC.\n\n{detalhes}\n\nFicamos ao dispor para qualquer esclarecimento.\n\nCom os melhores cumprimentos,\n{assinatura}' },
-  { id:'ss', name:'Seg. Social', tipos:['SS ADV'],
-    subject:'Contribuições SS — {mes} — {cliente}',
-    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar o valor das contribuições para a Segurança Social referentes ao mês de {mes}.\n\n{detalhes}\n\nO prazo de pagamento é até ao dia 20 do mês seguinte.\n\nCom os melhores cumprimentos,\n{assinatura}' },
-  { id:'dmr', name:'DMR', tipos:['DMR'],
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar que a declaração periódica de IVA referente ao período de {mes} foi submetida com sucesso.\n\nResumo:\n{detalhes}\n\nPor favor verifique os valores e informe-nos caso haja alguma divergência.\n\nFicamos ao dispor para qualquer esclarecimento.\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'irc', name:'IRC', tipos:['IRC 2024','IRC 2025'], priority:10,
+    subject:'Declaração IRC {ano} — {cliente}',
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar que foi processada a declaração de IRC referente ao exercício de {ano}.\n\nResumo:\n{detalhes}\n\nO prazo de pagamento da derrama e coleta apurada é o indicado na declaração.\n\nFicamos ao dispor para qualquer esclarecimento.\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'ss', name:'Seg. Social', tipos:['SS ADV','OSS'], priority:10,
+    subject:'Contribuições Segurança Social — {mes} — {cliente}',
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar o valor das contribuições para a Segurança Social referentes ao mês de {mes}.\n\nResumo:\n{detalhes}\n\nLembramos que o prazo de pagamento é até ao dia 20 do mês seguinte.\n\nCaso pretenda que procedamos ao pagamento em seu nome, por favor confirme a autorização com brevidade.\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'dmr', name:'DMR', tipos:['DMR'], priority:10,
     subject:'Declaração Mensal de Remunerações — {mes} — {cliente}',
-    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar que foi submetida a DMR referente ao mês de {mes}.\n\n{detalhes}\n\nCom os melhores cumprimentos,\n{assinatura}' },
-  { id:'irs', name:'IRS', tipos:['Prestação IRS 2024','Prestação IRS 2025','RENT IRS'],
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar que a Declaração Mensal de Remunerações (DMR) referente ao mês de {mes} foi submetida com sucesso.\n\nResumo:\n{detalhes}\n\nFicamos ao dispor para qualquer esclarecimento.\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'irs', name:'IRS', tipos:['Prestação IRS 2024','Prestação IRS 2025','RENT IRS'], priority:10,
     subject:'Prestação IRS — {mes} — {cliente}',
-    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar o valor da prestação de IRS referente ao período de {mes}.\n\n{detalhes}\n\nCom os melhores cumprimentos,\n{assinatura}' },
-  { id:'geral', name:'Geral', tipos:[],
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar o valor da prestação de IRS referente ao período de {mes}.\n\nResumo:\n{detalhes}\n\n{prazo_aviso}\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'rent', name:'RENT IRS', tipos:['RENT IRS'], priority:15,
+    subject:'Retenção na Fonte IRS — {mes} — {cliente}',
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar que a declaração de Retenção na Fonte de IRS referente ao mês de {mes} foi processada.\n\nResumo:\n{detalhes}\n\nFicamos ao dispor para qualquer esclarecimento.\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'multiplo', name:'Múltiplas obrigações', tipos:[], priority:1,
+    subject:'Obrigações fiscais — {mes} — {cliente}',
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio informar o estado das seguintes obrigações fiscais referentes ao período de {mes}:\n\n{detalhes}\n\nCaso haja alguma dúvida ou necessite de informação adicional, não hesite em contactar.\n\nCom os melhores cumprimentos,\n{assinatura}' },
+  { id:'geral', name:'Geral', tipos:[], priority:0,
     subject:'Prestação de contas — {mes} — {cliente}',
-    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio enviar a informação referente às seguintes obrigações fiscais:\n\n{detalhes}\n\nCom os melhores cumprimentos,\n{assinatura}' },
+    body:'Exmo(a). Sr(a). {cliente},\n\nVenho por este meio enviar a informação referente às seguintes obrigações:\n\n{detalhes}\n\nFicamos ao dispor para qualquer esclarecimento.\n\nCom os melhores cumprimentos,\n{assinatura}' },
 ];
 
 function loadEmailTemplates() {
@@ -1725,24 +1605,62 @@ function getAssinatura() { return localStorage.getItem('prestacoes_assinatura')|
 function saveAssinatura(v) { localStorage.setItem('prestacoes_assinatura',v); }
 
 function detectTemplate(tipos) {
-  const tpls=loadEmailTemplates();
-  if(!tipos||!tipos.length) return tpls.find(t=>t.id==='geral')||tpls[0];
-  for(const t of tpls){ if(t.tipos&&t.tipos.some(tt=>tipos.includes(tt))) return t; }
-  return tpls.find(t=>t.id==='geral')||tpls[0];
+  const tpls = loadEmailTemplates();
+  if (!tipos || !tipos.length) return tpls.find(t=>t.id==='geral') || tpls[0];
+  // score each template by how many tipos match
+  let best = null, bestScore = -1;
+  for (const t of tpls) {
+    if (!t.tipos || !t.tipos.length) continue;
+    const matches = t.tipos.filter(tt => tipos.includes(tt)).length;
+    const score = matches * (t.priority || 1);
+    if (score > bestScore) { bestScore = score; best = t; }
+  }
+  // if multiple tipos and no single match, use 'multiplo'
+  if (!best || bestScore === 0) {
+    if (tipos.length > 1) return tpls.find(t=>t.id==='multiplo') || tpls.find(t=>t.id==='geral') || tpls[0];
+    return tpls.find(t=>t.id==='geral') || tpls[0];
+  }
+  return best;
 }
 
-function buildBodyFromTemplate(tpl,rows,cliente,mes) {
-  const detalhes=rows.map(r=>{
-    let l='  \u2022 '+(r.tipo||[]).join(', ');
-    if(r.prazo) l+=' \u2014 prazo: '+new Date(r.prazo).toLocaleDateString('pt-PT',{day:'2-digit',month:'long',year:'numeric'});
+function buildBodyFromTemplate(tpl, rows, cliente, mes) {
+  const hoje = new Date();
+  // build detailed task lines
+  const detalhes = rows.map(r => {
+    const tipos = (r.tipo||[]).join(', ') || '—';
+    let l = '  • ' + tipos;
+    if (r.prazo) {
+      const d = new Date(r.prazo);
+      const diff = Math.round((d - hoje) / 86400000);
+      l += ' — prazo: ' + d.toLocaleDateString('pt-PT',{day:'2-digit',month:'long',year:'numeric'});
+      if (diff >= 0 && diff <= 5) l += ' ⚠ (urgente)';
+      else if (diff < 0) l += ' (em atraso)';
+    }
     return l;
   }).join('\n');
-  return (tpl.body||'')
-    .replace(/\{cliente\}/g,cliente).replace(/\{mes\}/g,mes)
-    .replace(/\{detalhes\}/g,detalhes).replace(/\{assinatura\}/g,getAssinatura());
+  // extract year from mes (e.g. JUN/2026 → 2026)
+  const ano = (mes||'').split('/')[1] || new Date().getFullYear();
+  // prazo_aviso: warning if any task has prazo soon
+  const prazos = rows.filter(r=>r.prazo).map(r=>new Date(r.prazo));
+  const proximoPrazo = prazos.sort((a,b)=>a-b)[0];
+  const prazoAviso = proximoPrazo
+    ? 'O prazo de entrega é até ' + proximoPrazo.toLocaleDateString('pt-PT',{day:'2-digit',month:'long',year:'numeric'}) + '.'
+    : '';
+  return (tpl.body || '')
+    .replace(/\{cliente\}/g, cliente)
+    .replace(/\{mes\}/g, mes)
+    .replace(/\{ano\}/g, ano)
+    .replace(/\{detalhes\}/g, detalhes)
+    .replace(/\{prazo_aviso\}/g, prazoAviso)
+    .replace(/\{assinatura\}/g, getAssinatura());
 }
-function buildSubjectFromTemplate(tpl,cliente,mes) {
-  return (tpl.subject||'').replace(/\{cliente\}/g,cliente).replace(/\{mes\}/g,mes);
+
+function buildSubjectFromTemplate(tpl, cliente, mes) {
+  const ano = (mes||'').split('/')[1] || new Date().getFullYear();
+  return (tpl.subject || '')
+    .replace(/\{cliente\}/g, cliente)
+    .replace(/\{mes\}/g, mes)
+    .replace(/\{ano\}/g, ano);
 }
 
 let currentEmailRows=[];
@@ -1791,13 +1709,26 @@ function openEmailSel() {
 }
 
 function renderTemplateQuickBar(tiposAtivos) {
-  const bar=document.getElementById('templateQuickBar'); if(!bar) return;
-  const tpls=loadEmailTemplates();
-  bar.innerHTML='<span style="font-size:11px;color:var(--text3);flex-shrink:0;align-self:center">Template:</span>'+
-    tpls.map(t=>{
-      const active=t.tipos&&t.tipos.length?t.tipos.some(tt=>tiposAtivos.includes(tt)):!tiposAtivos.length;
-      return '<button class="template-pill '+(active?'active':'')+'" onclick="applyTemplate(\''+t.id+'\')">'+t.name+'</button>';
+  const bar = document.getElementById('templateQuickBar'); if (!bar) return;
+  const tpls = loadEmailTemplates();
+  const detected = detectTemplate(tiposAtivos);
+  bar.innerHTML = '<span style="font-size:11px;color:var(--text3);flex-shrink:0;align-self:center;white-space:nowrap">Template:</span>' +
+    tpls.map(t => {
+      const isDetected = t.id === detected.id;
+      const isActive = isDetected;
+      return '<button class="template-pill ' + (isActive ? 'active' : '') + '" onclick="applyTemplate('' + t.id + '')" title="' + (isDetected ? '✓ Detetado automaticamente' : '') + '">' +
+        t.name + (isDetected ? ' ✓' : '') + '</button>';
     }).join('');
+  // show hint
+  const hint = document.getElementById('templateHint');
+  if (hint) {
+    if (tiposAtivos.length) {
+      hint.textContent = '✓ Template "' + detected.name + '" selecionado automaticamente com base em: ' + tiposAtivos.join(', ');
+      hint.style.display = 'block';
+    } else {
+      hint.style.display = 'none';
+    }
+  }
 }
 
 function applyTemplate(id) {
@@ -1941,7 +1872,12 @@ function renderAttachList(){
 
 
 // ── Sync indicator ─────────────────────────────────────────────────────────
-function setSyncing(v){ setConnectionState(v ? 'syncing' : 'ok'); }
+function setSyncing(v){
+  const dot=document.getElementById('syncDot');
+  const lbl=document.getElementById('syncLabel');
+  if(dot) dot.className='sync-dot'+(v?' syncing':'');
+  if(lbl) lbl.textContent=v?'A sincronizar…':'Sincronizado';
+}
 
 // ── Utils ──────────────────────────────────────────────────────────────────
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
