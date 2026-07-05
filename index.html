@@ -1716,7 +1716,7 @@ function renderTemplateQuickBar(tiposAtivos) {
     tpls.map(t => {
       const isDetected = t.id === detected.id;
       const isActive = isDetected;
-      return '<button class="template-pill ' + (isActive ? 'active' : '') + '" onclick="applyTemplate('' + t.id + '')" title="' + (isDetected ? '✓ Detetado automaticamente' : '') + '">' +
+      return '<button class="template-pill ' + (isActive ? 'active' : '') + '" onclick="applyTemplate(\'' + t.id + '\')" title="' + (isDetected ? '✓ Detetado automaticamente' : '') + '">' +
         t.name + (isDetected ? ' ✓' : '') + '</button>';
     }).join('');
   // show hint
