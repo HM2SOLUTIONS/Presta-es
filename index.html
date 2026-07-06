@@ -1330,6 +1330,22 @@ function openAdd(){
   setTimeout(()=>document.getElementById('aCliente').focus(),100);
 }
 
+function buildTipoCheckboxes(selected=[]) {
+  const wrap = document.getElementById('tipoCheckboxes');
+  if (!wrap) return;
+  const tipos = typeof getTipos === 'function' ? getTipos() : (window.TIPOS_BASE||[]);
+  wrap.innerHTML = tipos.map(t => `
+    <label style="display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:12px;background:${selected.includes(t)?'var(--accent-l)':'var(--surface)'};color:${selected.includes(t)?'var(--accent-d)':'var(--text)'}">
+      <input type="checkbox" ${selected.includes(t)?'checked':''} value="${t}"
+        onchange="this.parentElement.style.background=this.checked?'var(--accent-l)':'var(--surface)';this.parentElement.style.color=this.checked?'var(--accent-d)':'var(--text)'"
+        style="height:auto;width:auto"> ${t}
+    </label>`).join('');
+}
+
+function getSelectedTipos() {
+  return [...document.querySelectorAll('#tipoCheckboxes input:checked')].map(x => x.value);
+}
+
 function openEdit(id){
   editingId=id;
   const r=data.find(x=>x.id===id);
