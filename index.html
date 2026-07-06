@@ -256,8 +256,9 @@ td.td-cliente { font-weight:600; font-size:14px; }
 .new-month-btn:hover { border-color:var(--accent); color:var(--accent); }
 
 /* ── Row hover actions ── */
-.row-actions { display:flex; gap:3px; opacity:0; transition:opacity var(--transition); }
+.row-actions { display:flex; gap:3px; opacity:0.3; transition:opacity var(--transition); }
 tbody tr:hover .row-actions { opacity:1; }
+tbody tr:focus-within .row-actions { opacity:1; }
 
 /* ── Badge clickable ── */
 .badge { cursor:pointer; transition:filter var(--transition); }
@@ -848,7 +849,6 @@ const HISTORY_KEY = 'prestacoes_email_history';
 const CUSTOM_TIPOS_KEY = 'prestacoes_custom_tipos';
 const CACHE_KEY = 'prestacoes_cache';
 const CACHE_TS_KEY = 'prestacoes_cache_ts';
-const TRASH_KEY = 'prestacoes_trash';
 const CACHE_TTL = 5 * 60 * 1000;
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -2418,6 +2418,8 @@ function renderProgressBar() {
 }
 
 // ── Activity log ───────────────────────────────────────────────────────────────
+const ACTIVITY_KEY = 'prestacoes_activity';
+const CLIENTS_KEY = 'prestacoes_clients';
 
 function loadActivity() {
   return JSON.parse(localStorage.getItem(ACTIVITY_KEY) || '{}');
