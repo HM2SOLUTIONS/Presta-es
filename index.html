@@ -552,24 +552,6 @@ tr:hover .hist-resend { opacity:1; }
 
   <!-- Cliente view -->
   <div id="tabClienteView" style="display:none">
-    <!-- Cliente toolbar -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-      <div class="search-wrap" style="max-width:220px">
-        <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="fClienteSearch" placeholder="Pesquisar cliente…" oninput="renderClienteView()">
-      </div>
-      <select id="fClienteAtivos" onchange="renderClienteView()" style="height:36px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;padding:0 10px;background:var(--surface);color:var(--text);font-family:'Inter',sans-serif;outline:none">
-        <option value="ativos">Ativos este mês</option>
-        <option value="todos">Todos os clientes</option>
-      </select>
-      <span id="clienteCount" style="font-size:12px;color:var(--text3)"></span>
-      <div style="margin-left:auto">
-        <button class="btn btn-sm btn-primary" onclick="openNewClienteModal()">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Novo cliente
-        </button>
-      </div>
-    </div>
     <div id="clienteList"></div>
   </div>
 
@@ -866,6 +848,7 @@ const HISTORY_KEY = 'prestacoes_email_history';
 const CUSTOM_TIPOS_KEY = 'prestacoes_custom_tipos';
 const CACHE_KEY = 'prestacoes_cache';
 const CACHE_TS_KEY = 'prestacoes_cache_ts';
+const TRASH_KEY = 'prestacoes_trash';
 const CACHE_TTL = 5 * 60 * 1000;
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -1967,82 +1950,53 @@ function syncClientsFromData() {
 function renderClienteView() {
   syncClientsFromData();
   const clients = loadClients();
+  const nomes = Object.keys(clients).sort();
   const today = new Date();
-  const q = (document.getElementById('fClienteSearch')||{}).value?.toLowerCase()||'';
-  const modo = (document.getElementById('fClienteAtivos')||{}).value || 'ativos';
 
-  let nomes = Object.keys(clients).sort();
-
-  if (modo === 'ativos') {
-    nomes = nomes.filter(nome =>
-      data.some(r => r.cliente === nome && r.mes === activeMes && r.status !== 'Concluído')
-    );
-  }
-
-  if (q) nomes = nomes.filter(nome => nome.toLowerCase().includes(q));
-
-  const countEl = document.getElementById('clienteCount');
-  if (countEl) countEl.textContent = nomes.length + ' cliente(s)' + (modo==='ativos' ? ' ativos em ' + activeMes : '');
-
-  document.getElementById('clienteList').innerHTML = nomes.map(nome => {
+  document.getElementById('clienteList').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <span style="font-size:13px;color:var(--text2)">${nomes.length} cliente(s)</span>
+      <button class="btn btn-sm btn-primary" onclick="openNewClienteModal()">+ Novo cliente</button>
+    </div>` +
+  nomes.map(nome => {
     const c = clients[nome];
-    const allTasks = data.filter(r => r.cliente === nome);
-    const mesAtivo = data.filter(r => r.cliente === nome && r.mes === activeMes);
-    const done = mesAtivo.filter(r => r.status === 'Concluído').length;
-    const pend = mesAtivo.filter(r => r.status === 'Não iniciado').length;
-    const andamento = mesAtivo.filter(r => r.status === 'Em andamento').length;
-    const late = mesAtivo.filter(r => r.prazo && new Date(r.prazo) < today && r.status !== 'Concluído').length;
-    const pct = mesAtivo.length ? Math.round(done / mesAtivo.length * 100) : 0;
-    const mesesCount = [...new Set(allTasks.map(r => r.mes))].length;
-
+    const tasks = data.filter(r=>r.cliente===nome);
+    const done = tasks.filter(r=>r.status==='Concluído').length;
+    const late = tasks.filter(r=>r.prazo&&new Date(r.prazo)<today&&r.status!=='Concluído').length;
+    const pct = tasks.length ? Math.round(done/tasks.length*100) : 0;
+    const cid = nome.replace(/[^a-zA-Z0-9]/g,'_');
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;box-shadow:var(--shadow)">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-        <div style="display:flex;align-items:center;gap:12px;min-width:0">
-          <div style="width:40px;height:40px;border-radius:50%;background:var(--accent-l);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--accent);flex-shrink:0">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>
-          <div style="min-width:0">
-            <div style="font-weight:700;font-size:15px">${nome}</div>
-            <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px">
-              ${c.email ? `<span>✉ ${c.email}</span>` : '<span style="color:var(--text3)">sem email</span>'}
-              ${c.nif ? `<span style="color:var(--text3)">· NIF ${c.nif}</span>` : ''}
-              <span style="color:var(--text3)">· ${mesesCount} mês(es)</span>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:38px;height:38px;border-radius:50%;background:var(--accent-l);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:var(--accent);flex-shrink:0">${nome.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+          <div>
+            <div style="font-weight:600;font-size:15px">${nome}</div>
+            <div style="font-size:12px;color:var(--text2)">
+              ${c.email?`✉ ${c.email}`:'<span style="color:var(--text3)">sem email</span>'}
+              ${c.nif?` · NIF ${c.nif}`:''}
             </div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex-shrink:0">
-          ${late > 0 ? `<span style="font-size:11px;background:var(--red-bg);color:var(--red);padding:3px 8px;border-radius:10px;font-weight:600">⚠ ${late} atraso</span>` : ''}
-          ${pend > 0 ? `<span style="font-size:11px;background:var(--yellow-bg);color:var(--yellow);padding:3px 8px;border-radius:10px;font-weight:600">◎ ${pend} pendente${pend>1?'s':''}</span>` : ''}
-          ${andamento > 0 ? `<span style="font-size:11px;background:var(--accent-l);color:var(--accent-d);padding:3px 8px;border-radius:10px;font-weight:600">↻ ${andamento} em curso</span>` : ''}
-          ${mesAtivo.length && pct === 100 ? `<span style="font-size:11px;background:var(--green-bg);color:var(--green);padding:3px 8px;border-radius:10px;font-weight:600">✓ Concluído</span>` : ''}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          ${late>0?`<span style="font-size:11px;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:10px;font-weight:500">⚠ ${late} atraso</span>`:''}
+          ${tasks.length?`<span style="font-size:11px;background:${pct===100?'var(--green-bg)':'var(--accent-l)'};color:${pct===100?'var(--green)':'var(--accent-d)'};padding:2px 8px;border-radius:10px;font-weight:500">${pct}% concluído</span>`:''}
           <button class="btn btn-sm" onclick="openEditClienteModal('${nome.replace(/'/g,"\'")}')">✏ Editar</button>
           <button class="btn btn-sm btn-primary" onclick="openEmailCliente('${nome.replace(/'/g,"\'")}')">✉ Email</button>
           <button class="btn btn-sm" onclick="filterByCliente('${nome.replace(/'/g,"\'")}')">Ver tarefas →</button>
         </div>
       </div>
-      ${mesAtivo.length ? `
-      <div style="margin-top:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-          <span style="font-size:11px;color:var(--text2)">${activeMes} — ${done}/${mesAtivo.length} concluídas</span>
-          <span style="font-size:11px;font-weight:700;font-family:var(--mono);color:${pct===100?'var(--green)':pct>50?'var(--accent)':'var(--yellow)'}">${pct}%</span>
-        </div>
-        <div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:${pct===100?'var(--green)':pct>50?'var(--accent)':'#D97706'};transition:width .4s"></div>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">
-          ${mesAtivo.map(t=>`<span style="font-size:11px;padding:2px 7px;border-radius:5px;border:1px solid var(--border);background:${t.status==='Concluído'?'var(--green-bg)':t.status==='Em andamento'?'var(--accent-l)':'var(--surface2)'};color:${t.status==='Concluído'?'var(--green)':t.status==='Em andamento'?'var(--accent-d)':'var(--text2)'};font-family:var(--mono)">${(t.tipo||[]).join(', ')||'—'}</span>`).join('')}
-        </div>
-      </div>` : `<div style="margin-top:8px;font-size:12px;color:var(--text3)">Sem tarefas em ${activeMes}</div>`}
-      ${c.tipos && c.tipos.length ? `
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-        <span style="font-size:11px;color:var(--text3)">Habituais:</span>
+      ${tasks.length?`
+      <div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;margin-bottom:10px">
+        <div style="height:100%;width:${pct}%;background:${pct===100?'var(--green)':pct>50?'var(--accent)':'#D97706'};transition:width .4s"></div>
+      </div>`:''}
+      ${c.tipos&&c.tipos.length?`
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
+        <span style="font-size:11px;color:var(--text3);margin-right:4px">Tarefas habituais:</span>
         ${c.tipos.map(t=>`<span class="tag">${t}</span>`).join('')}
-      </div>` : ''}
+      </div>`:''}
     </div>`;
-  }).join('') || `<div class="empty"><div class="empty-icon">👤</div>
-    <div>${modo==='ativos'?'Sem clientes ativos em '+activeMes:'Sem clientes'}</div>
-    <div style="font-size:12px;margin-top:6px;color:var(--text3)">${modo==='ativos'?'Mude para "Todos os clientes" para ver o histórico':''}</div>
-  </div>`;
+  }).join('') || '<div class="empty"><div class="empty-icon">👤</div><div>Sem clientes ainda</div><div style="font-size:12px;margin-top:6px;color:var(--text3)">São criados automaticamente a partir das tarefas</div></div>';
 }
-
 
 function openEmailCliente(nome) {
   const rows = data.filter(r=>r.cliente===nome);
@@ -2464,8 +2418,6 @@ function renderProgressBar() {
 }
 
 // ── Activity log ───────────────────────────────────────────────────────────────
-const ACTIVITY_KEY = 'prestacoes_activity';
-const CLIENTS_KEY = 'prestacoes_clients';
 
 function loadActivity() {
   return JSON.parse(localStorage.getItem(ACTIVITY_KEY) || '{}');
