@@ -778,6 +778,10 @@ const HISTORY_KEY = 'prestacoes_email_history';
 const CUSTOM_TIPOS_KEY = 'prestacoes_custom_tipos';
 const CACHE_KEY = 'prestacoes_cache';
 const CACHE_TS_KEY = 'prestacoes_cache_ts';
+const TRASH_KEY = 'prestacoes_trash';
+const ACTIVITY_KEY = 'prestacoes_activity';
+const CLIENTS_KEY = 'prestacoes_clients';
+const EMAIL_TEMPLATES_KEY = 'prestacoes_email_templates';
 const CACHE_TTL = 5 * 60 * 1000;
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -1504,7 +1508,6 @@ function showDupConflictInfo(count, total, names) {
 }
 
 // ── Email templates ────────────────────────────────────────────────────────
-const EMAIL_TEMPLATES_KEY = 'prestacoes_email_templates';
 
 const DEFAULT_TEMPLATES = [
   { id:'iva', name:'IVA', tipos:['IVA'],
@@ -2412,8 +2415,6 @@ function renderProgressBar() {
 }
 
 // ── Activity log ───────────────────────────────────────────────────────────────
-const ACTIVITY_KEY = 'prestacoes_activity';
-const CLIENTS_KEY = 'prestacoes_clients';
 
 function loadActivity() {
   return JSON.parse(localStorage.getItem(ACTIVITY_KEY) || '{}');
