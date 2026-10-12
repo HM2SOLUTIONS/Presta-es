@@ -261,6 +261,45 @@ button.tag:hover{border-color:var(--accent);color:var(--accent-d)}
 .spin{width:18px;height:18px;border:2px solid var(--line2);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 
+/* ── Edição rápida e ficha do cliente ── */
+.cli-link{border:0;background:none;font-weight:600;font-size:14px;text-align:left;padding:2px 6px;margin:-2px -6px;border-radius:6px;color:inherit}
+.cli-link:hover{background:var(--accent-soft);color:var(--accent-d)}
+tr.done .cli-link{color:var(--ink3);text-decoration:line-through;text-decoration-color:var(--line2)}
+.cellbtn{border:0;background:transparent;text-align:left;padding:3px 6px;margin:-3px -6px;border-radius:6px;display:inline-block;min-width:36px;color:inherit}
+.cellbtn:hover{background:var(--accent-soft)}
+.cellbtn .ph{color:var(--ink3);font-size:12.5px}
+.cellbtn:hover .ph{color:var(--accent-d)}
+.btn.icon.warn{color:var(--todo)}
+#pop{position:fixed;z-index:210;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-lg);padding:12px;min-width:240px;max-width:340px;display:none}
+#pop.open{display:block}
+.qd{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.backdrop{position:fixed;inset:0;background:rgba(10,18,15,.35);opacity:0;pointer-events:none;transition:opacity .18s;z-index:89}
+.backdrop.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:450px;max-width:100%;background:var(--panel);border-left:1px solid var(--line);box-shadow:var(--shadow-lg);transform:translateX(100%);transition:transform .22s ease;z-index:90;display:flex;flex-direction:column}
+.drawer.open{transform:none}
+.dr-head{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.dr-name{flex:1;min-width:0;border:1px solid transparent;border-radius:6px;background:transparent;font-size:18px;font-weight:700;padding:4px 8px;margin:-4px 0}
+.dr-name:hover{border-color:var(--line2)}
+.dr-name:focus{border-color:var(--accent);outline:none;background:var(--panel)}
+.dr-body{flex:1;overflow:auto;padding:16px 18px 40px}
+.dr-sec{font-size:13px;font-weight:700;margin:22px 0 8px;display:flex;justify-content:space-between;align-items:center}
+.dr-sec span{font-weight:500;color:var(--ink3);font-size:12px}
+details.mo{border:1px solid var(--line);border-radius:var(--r-sm);margin-bottom:8px;overflow:hidden}
+details.mo summary{cursor:pointer;padding:9px 12px;font-weight:600;background:var(--panel2);display:flex;justify-content:space-between;list-style:none}
+details.mo summary::-webkit-details-marker{display:none}
+details.mo summary small{font-weight:500;color:var(--ink2)}
+.hint{font-size:12px;color:var(--late);min-height:16px;margin-top:3px}
+.pz{display:block}
+.btn.portal{padding:0 8px;font-weight:700;font-size:11.5px;color:var(--ink2)}
+.btn.portal:hover{color:var(--accent-d);border-color:var(--accent)}
+.cred{border:1px solid var(--line);border-radius:var(--r-sm);padding:12px;margin-bottom:10px}
+.cred-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;gap:8px}
+.cred-h span{font-size:12px;color:var(--ink2)}
+.cred-row{display:flex;gap:4px;align-items:center}
+.cred-act{margin-top:8px}
+.cred-foot{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+@media(max-width:860px){.drawer{width:100%}}
+
 /* ── Telemóvel ── */
 @media(max-width:860px){
   .side{inset:auto 0 0 0;width:100%;height:60px;flex-direction:row;padding:6px 8px;border-right:0;border-top:1px solid var(--line);justify-content:space-around}
@@ -350,7 +389,7 @@ button.tag:hover{border-color:var(--accent);color:var(--accent-d)}
               <th class="col-n">Nº</th>
               <th class="sort col-tipo" data-sort="tipo">Tipo <span class="arr"></span></th>
               <th class="sort" data-sort="prazo">Prazo <span class="arr"></span></th>
-              <th style="width:120px"></th>
+              <th style="width:200px"></th>
             </tr></thead>
             <tbody id="tbody"></tbody>
           </table>
@@ -508,10 +547,21 @@ button.tag:hover{border-color:var(--accent);color:var(--accent-d)}
 
 <div class="overlay" id="confirmOverlay"><div class="modal" style="width:400px">
   <div class="m-body" style="padding-top:22px"><h2 id="confirmTitle" style="font-size:17px;margin-bottom:6px"></h2><p id="confirmMsg" style="color:var(--ink2)"></p></div>
-  <div class="m-foot"><button class="btn" onclick="closeModal('confirmOverlay')">Cancelar</button><button class="btn primary" id="confirmOk"></button></div>
+  <div class="m-foot"><button class="btn" onclick="cancelConfirm()">Cancelar</button><button class="btn primary" id="confirmOk"></button></div>
 </div></div>
 
+<div class="overlay" id="cofreModal"><div class="modal" style="width:420px">
+  <div class="m-head"><h2 id="cofreTitle">Cofre de palavras-passe</h2><button class="btn icon" onclick="cancelCofre()" aria-label="Fechar" data-ic="x"></button></div>
+  <div class="m-body"><p id="cofreMsg" style="color:var(--ink2);margin-bottom:14px"></p>
+    <div class="field"><label for="cofrePass">Palavra-passe mestra</label><input class="input" type="password" id="cofrePass" autocomplete="off"></div>
+    <div class="field" id="cofreConfWrap" hidden><label for="cofrePass2">Repetir palavra-passe mestra</label><input class="input" type="password" id="cofrePass2" autocomplete="off"></div>
+    <div id="cofreErr" style="color:var(--late);font-size:12.5px;min-height:18px"></div></div>
+  <div class="m-foot"><button class="btn" onclick="cancelCofre()">Cancelar</button><button class="btn primary" id="cofreOk" onclick="submitCofre()">Desbloquear</button></div>
+</div></div>
 <div id="menu"></div>
+<div id="pop"></div>
+<div class="backdrop" id="backdrop" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" aria-label="Ficha do cliente"></aside>
 <div id="toast"></div>
 
 <script>
@@ -520,7 +570,7 @@ const DB_ID='29696dd2e40880a3b7afcc80a77b3de6';
 const TIPOS_BASE=['SS ADV','IRC 2024','IRC 2025','Prestação IRS 2024','Prestação IRS 2025','OSS','IVA','DMR','RENT IRS'];
 const MESES=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 const ESTADOS=[{k:'Não iniciado',c:'todo',l:'Não iniciado'},{k:'Em andamento',c:'doing',l:'Em andamento'},{k:'Concluído',c:'done',l:'Concluído'}];
-const K={token:'prestacoes_notion_token',worker:'prestacoes_worker_url',emails:'prestacoes_emails',history:'prestacoes_email_history',tipos:'prestacoes_custom_tipos',cache:'prestacoes_cache',cacheTs:'prestacoes_cache_ts',trash:'prestacoes_trash',activity:'prestacoes_activity',clients:'prestacoes_clients',tpls:'prestacoes_email_templates',sign:'prestacoes_assinatura'};
+const K={token:'prestacoes_notion_token',worker:'prestacoes_worker_url',emails:'prestacoes_emails',history:'prestacoes_email_history',tipos:'prestacoes_custom_tipos',cache:'prestacoes_cache',cacheTs:'prestacoes_cache_ts',trash:'prestacoes_trash',activity:'prestacoes_activity',clients:'prestacoes_clients',tpls:'prestacoes_email_templates',sign:'prestacoes_assinatura',vault:'prestacoes_cofre'};
 const CACHE_TTL=5*60*1000;
 
 /* ══════════ Ícones ══════════ */
@@ -546,7 +596,9 @@ const P={
   check:'<path d="M20 6L9 17l-5-5"/>',
   grip:'<circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/>',
   left:'<path d="M15 18l-6-6 6-6"/>',right:'<path d="M9 18l6-6-6-6"/>',
-  doc:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>'
+  doc:'<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/>',
+  eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>'
 };
 const ic=n=>`<svg class="i" viewBox="0 0 24 24">${P[n]||''}</svg>`;
 const $=id=>document.getElementById(id);
@@ -558,7 +610,7 @@ const now0=new Date();
 let activeMes=MESES[now0.getMonth()]+'/'+now0.getFullYear();
 let firstLoad=true,activeTipo=null,filterLate=false,statusFilter='',selected=new Set(),editingId=null;
 let sortCol=null,sortDir=1,currentTab='main',kanbanMes=null,cliMode='ativos',attachedFiles=[],currentEmailRows=[];
-let qaTipos=[],dragId=null,dupRows=[],editingCliente=null;
+let qaTipos=[],dragId=null,dupRows=[],editingCliente=null,drawerCliente=null;
 
 /* ══════════ Datas ══════════ */
 const pd=s=>{const [y,m,d]=String(s).slice(0,10).split('-').map(Number);return new Date(y,m-1,d)};
@@ -652,7 +704,7 @@ async function connectNotion(){
 function showApp(){$('setup').style.display='none';$('app').style.display='block'}
 function disconnect(){
   confirmAction('Desligar do Notion?','A chave de integração será removida deste navegador.','Desligar',()=>{
-    localStorage.removeItem(K.token);token='';
+    localStorage.removeItem(K.token);token='';vaultKey=null;
     $('app').style.display='none';$('setup').style.display='flex';$('tokenInput').value='';
   });
 }
@@ -720,6 +772,7 @@ function switchTab(tab){
 function render(){
   syncClients();updateBadges();
   ({main:renderMain,kanban:renderKanban,prazos:renderPrazos,cliente:renderClientes,history:renderHistory,trash:renderTrash,tipos:renderTipos})[currentTab]();
+  if(drawerCliente!==null)renderDrawer();
 }
 function updateBadges(){
   const late=data.filter(isLate).length,lc=$('lateCount');
@@ -788,13 +841,14 @@ function renderMain(){
       const e=ESTADOS.find(x=>x.k===r.status)||ESTADOS[0];
       return `<tr id="row-${r.id}" class="${isLate(r)?'late':''} ${e.c==='done'?'done':''}">
         <td><input type="checkbox" ${selected.has(r.id)?'checked':''} onchange="toggleSel('${r.id}',this)" aria-label="Selecionar ${esc(r.cliente)}"></td>
-        <td class="cli">${esc(r.cliente)}</td>
+        <td class="cli"><button class="cli-link" data-n="${esc(r.cliente)}" onclick="openDrawer(this.dataset.n)" title="Abrir ficha do cliente">${esc(r.cliente)}</button></td>
         <td><button class="pill ${e.c}" onclick="statusMenu(event,'${r.id}')" title="Mudar estado">${e.l}</button></td>
-        <td class="num col-n">${esc(r.n||'—')}</td>
-        <td class="col-tipo">${(r.tipo||[]).map(t=>`<button class="tag" data-t="${esc(t)}" onclick="setTipo(this.dataset.t)">${esc(t)}</button>`).join('')}</td>
-        <td>${prazoHTML(r)}</td>
+        <td class="num col-n"><button class="cellbtn" onclick="numMenu(event,'${r.id}')" title="Alterar Nº">${r.n?esc(r.n):'<span class="ph">—</span>'}</button></td>
+        <td class="col-tipo"><button class="cellbtn" onclick="tipoPop(event,'${r.id}')" title="Alterar tipos">${(r.tipo||[]).length?(r.tipo||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join(''):'<span class="ph">+ tipo</span>'}</button></td>
+        <td><button class="cellbtn" onclick="prazoPop(event,'${r.id}')" title="Alterar prazo">${r.prazo?prazoHTML(r):'<span class="ph">+ prazo</span>'}</button></td>
         <td><div class="acts">
-          <button class="btn icon" onclick="openEmail('${r.id}')" title="Email">${ic('mail')}</button>
+          <button class="btn sm portal" data-n="${esc(r.cliente)}" onclick="abrirPortal(this.dataset.n,'at')" title="Abrir Portal das Finanças e copiar o NIF">AT</button><button class="btn sm portal" data-n="${esc(r.cliente)}" onclick="abrirPortal(this.dataset.n,'ss')" title="Abrir Segurança Social Direta e copiar o NISS">SS</button>
+          <button class="btn icon${emailsMap[r.cliente]?'':' warn'}" onclick="openEmail('${r.id}')" title="${emailsMap[r.cliente]?'Preparar email':'Sem email guardado para este cliente'}">${ic('mail')}</button>
           <button class="btn icon" onclick="openEdit('${r.id}')" title="Editar">${ic('edit')}</button>
           <button class="btn icon" onclick="rowMenu(event,'${r.id}')" title="Mais ações">${ic('more')}</button>
         </div></td></tr>`;
@@ -834,7 +888,7 @@ function showMenu(e,items){
   m.style.top=(b.bottom+mh+8>innerHeight?Math.max(8,b.top-mh-4):b.bottom+4)+'px';
 }
 $('menu').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const it=menuItems[+b.dataset.i];$('menu').classList.remove('open');if(it)it.fn()});
-document.addEventListener('click',e=>{if(!e.target.closest('#menu'))$('menu').classList.remove('open')});
+document.addEventListener('click',e=>{if(!e.target.closest('#menu'))$('menu').classList.remove('open');if(!e.target.closest('#pop'))closePop()});
 function statusMenu(e,id){
   const r=data.find(x=>x.id===id);
   showMenu(e,ESTADOS.map(s=>({label:s.l+(r.status===s.k?' ✓':''),sw:`var(--${s.c==='todo'?'todo-bar':s.c==='doing'?'doing-bar':'done-bar'})`,fn:()=>setStatus(id,s.k)})));
@@ -844,6 +898,8 @@ function rowMenu(e,id){
   showMenu(e,[
     {label:'Duplicar para o mês seguinte',icon:'copy',fn:()=>duplicateSingle(id)},
     {label:'Histórico de alterações',icon:'clock',fn:()=>openActivity(id)},
+    {label:'Entrar nas Finanças (copia o NIF)',icon:'ext',fn:()=>abrirPortal(r.cliente,'at')},
+    {label:'Entrar na Segurança Social (copia o NISS)',icon:'ext',fn:()=>abrirPortal(r.cliente,'ss')},
     {label:'Abrir no Notion',icon:'ext',fn:()=>window.open(r.url,'_blank','noopener')},
     {label:'Mover para o lixo',icon:'trash',danger:true,fn:()=>deleteRow(id)}
   ]);
@@ -854,7 +910,7 @@ async function setStatus(id,next){
   try{
     await notionReq('/v1/pages/'+id,'PATCH',{properties:{Status:{status:{name:next}}}});
     logActivity(id,'Estado alterado',old+' → '+next);invalidateCache();
-    toast(`${r.cliente}: ${next}`);
+    toast(`${r.cliente}: ${next}`,'',()=>setStatus(id,old));
   }catch(e){r.status=old;render();toast('Não foi possível guardar: '+e.message,'error')}
 }
 async function bulkChangeStatus(s){
@@ -1045,7 +1101,7 @@ function renderKanban(){
     return `<div class="col" data-s="${s.k}" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="kanbanDrop(event,'${s.k}')">
       <div class="col-h"><span class="pill ${s.c}">${s.l}</span><b style="color:var(--ink2)">${cards.length}</b></div>
       ${cards.map(r=>`<div class="kcard${isLate(r)?' late':''}" draggable="true" ondragstart="dragId='${r.id}';this.classList.add('drag')" ondragend="this.classList.remove('drag')">
-        <div class="k-name">${esc(r.cliente)}</div>
+        <div class="k-name"><button class="cli-link" data-n="${esc(r.cliente)}" onclick="openDrawer(this.dataset.n)">${esc(r.cliente)}</button></div>
         <div>${(r.tipo||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
         <div class="k-foot">${prazoHTML(r)}
           <div style="display:flex;gap:0">
@@ -1063,7 +1119,7 @@ function renderPrazos(){
   const g=[['g-late','Em atraso',open.filter(r=>dd(r.prazo)<0)],['','Hoje',open.filter(r=>dd(r.prazo)===0)],['','Próximos 7 dias',open.filter(r=>dd(r.prazo)>0&&dd(r.prazo)<=7)],['','Mais tarde',open.filter(r=>dd(r.prazo)>7)],['','Sem prazo definido',data.filter(r=>r.status!=='Concluído'&&!r.prazo&&r.mes===activeMes)]];
   const html=g.filter(x=>x[2].length).map(([c,t,rows])=>`<div class="group ${c}"><h3>${t}<span>${rows.length}</span></h3><div class="card">${rows.map(r=>{
     const e=ESTADOS.find(x=>x.k===r.status);
-    return `<div class="row"><div class="grow"><b>${esc(r.cliente)}</b><span class="meta">${(r.tipo||[]).map(esc).join(', ')||'—'} · ${esc(r.mes)}</span></div>
+    return `<div class="row"><div class="grow"><b><button class="cli-link" data-n="${esc(r.cliente)}" onclick="openDrawer(this.dataset.n)">${esc(r.cliente)}</button></b><span class="meta">${(r.tipo||[]).map(esc).join(', ')||'—'} · ${esc(r.mes)}</span></div>
       ${prazoHTML(r)}<button class="pill ${e.c}" onclick="statusMenu(event,'${r.id}')">${e.l}</button>
       <button class="btn icon" onclick="openEdit('${r.id}')" title="Editar">${ic('edit')}</button></div>`}).join('')}</div></div>`).join('');
   $('prazosBody').innerHTML=html||`<div class="card"><div class="empty"><b>Sem prazos pendentes</b>Tudo o que tem prazo está concluído.</div></div>`;
@@ -1083,14 +1139,14 @@ function renderClientes(){
     const c=clients[n],m=data.filter(r=>r.cliente===n&&r.mes===activeMes),done=m.filter(r=>r.status==='Concluído').length,pct=m.length?Math.round(done/m.length*100):0;
     const todo=m.filter(r=>r.status==='Não iniciado').length,doing=m.filter(r=>r.status==='Em andamento').length,late=m.filter(isLate).length;
     return `<div class="ccard${pct===100&&m.length?' ok':''}">
-      <div style="display:flex;gap:12px;align-items:center"><div class="avatar">${esc(n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase())}</div>
+      <div style="display:flex;gap:12px;align-items:center;cursor:pointer" data-n="${esc(n)}" onclick="openDrawer(this.dataset.n)"><div class="avatar">${esc(n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase())}</div>
         <div style="min-width:0;flex:1"><b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n)}</b>
         <span style="font-size:12.5px;color:var(--ink2)">${c.email?esc(c.email):'sem email'}${c.nif?' · NIF '+esc(c.nif):''}</span></div></div>
       ${m.length?`<div><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:5px"><span>${done} de ${m.length} em ${activeMes}</span><b>${pct}%</b></div><div class="mini"><i style="width:${pct}%"></i></div></div>
       <div style="display:flex;gap:5px;flex-wrap:wrap">${late?`<span class="badge late">${late} em atraso</span>`:''}${todo?`<span class="badge todo">${todo} por iniciar</span>`:''}${doing?`<span class="badge doing">${doing} em andamento</span>`:''}${pct===100?'<span class="badge done">Concluído</span>':''}</div>`
       :`<span style="font-size:12.5px;color:var(--ink3)">Sem tarefas em ${activeMes}</span>`}
       ${c.tipos?.length?`<div>${c.tipos.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
-      <div style="display:flex;gap:6px;margin-top:auto"><button class="btn sm" data-n="${esc(n)}" onclick="openClienteModal(this.dataset.n)">${ic('edit')}Editar</button><button class="btn sm" data-n="${esc(n)}" onclick="openEmailCliente(this.dataset.n)">${ic('mail')}Email</button><button class="btn sm" data-n="${esc(n)}" onclick="filterByCliente(this.dataset.n)">Ver tarefas</button></div>
+      <div style="display:flex;gap:6px;margin-top:auto"><button class="btn sm" data-n="${esc(n)}" onclick="openDrawer(this.dataset.n)">${ic('edit')}Editar</button><button class="btn sm" data-n="${esc(n)}" onclick="openEmailCliente(this.dataset.n)">${ic('mail')}Email</button><button class="btn sm portal" data-n="${esc(n)}" onclick="abrirPortal(this.dataset.n,'at')" title="Abrir Finanças e copiar o NIF">AT</button><button class="btn sm portal" data-n="${esc(n)}" onclick="abrirPortal(this.dataset.n,'ss')" title="Abrir Segurança Social e copiar o NISS">SS</button><button class="btn sm" data-n="${esc(n)}" onclick="filterByCliente(this.dataset.n)">Ver tarefas</button></div>
     </div>`}).join('')||`<div class="card" style="grid-column:1/-1"><div class="empty"><b>${cliMode==='ativos'?'Não há clientes por concluir':'Nenhum cliente nesta lista'}</b>${cliMode==='ativos'?`Todos os clientes de ${activeMes} estão concluídos.`:''}</div></div>`;
 }
 $('fCli').addEventListener('input',renderClientes);
@@ -1283,26 +1339,325 @@ async function syncTipoToNotion(rows,msg){
   toast(`${msg}. ${ok}/${rows.length} tarefa(s) atualizadas no Notion.`,ok<rows.length?'error':'');
 }
 
+/* ══════════ Edição rápida (na própria tabela) ══════════ */
+const toIso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const mNum=s=>{const [mm,yy]=s.split('/');return +yy*100+MESES.indexOf(mm)};
+function placeFloat(el,anchor){
+  const b=anchor.getBoundingClientRect(),w=el.offsetWidth,h=el.offsetHeight;
+  el.style.left=Math.max(8,Math.min(b.left,innerWidth-w-8))+'px';
+  el.style.top=(b.bottom+h+8>innerHeight?Math.max(8,b.top-h-4):b.bottom+4)+'px';
+}
+function showPop(e,html){e.stopPropagation();$('menu').classList.remove('open');const p=$('pop');p.innerHTML=html;p.classList.add('open');placeFloat(p,e.currentTarget)}
+function closePop(){$('pop').classList.remove('open')}
+async function patchTask(id,props,local,log){
+  const r=data.find(x=>x.id===id);if(!r)return;
+  const old={...r};Object.assign(r,local);render();
+  try{await notionReq('/v1/pages/'+id,'PATCH',{properties:props});if(log)logActivity(id,log[0],log[1]||'');invalidateCache();return true}
+  catch(e){Object.assign(r,old);render();toast('Não foi possível guardar: '+e.message,'error')}
+}
+function prazoPop(e,id){
+  const r=data.find(x=>x.id===id);if(!r)return;
+  const add=n=>{const d=today();d.setDate(d.getDate()+n);return toIso(d)};
+  const parts=(r.mes||'').split('/'),eom=parts.length===2&&MESES.includes(parts[0])?toIso(new Date(+parts[1],MESES.indexOf(parts[0])+1,0)):null;
+  const q=(l,v)=>`<button class="tchip" onclick="setPrazo('${id}',${v?`'${v}'`:'null'})">${l}</button>`;
+  showPop(e,`<div style="font-weight:600;margin-bottom:8px">Prazo · ${esc(r.cliente)}</div>
+    <input class="input" type="date" id="pzIn" value="${r.prazo||''}" onchange="setPrazo('${id}',this.value||null)">
+    <div class="qd">${q('Hoje',add(0))}${q('Amanhã',add(1))}${q('+7 dias',add(7))}${eom?q('Fim de '+r.mes,eom):''}${r.prazo?q('Limpar',null):''}</div>`);
+  setTimeout(()=>$('pzIn')&&$('pzIn').focus(),30);
+}
+async function setPrazo(id,v){
+  closePop();const r=data.find(x=>x.id===id);if(!r||(r.prazo||null)===(v||null))return;
+  const log=['Prazo alterado',(r.prazo||'—')+' → '+(v||'—')];
+  await patchTask(id,{'Prazo':v?{date:{start:v}}:{date:null}},{prazo:v||null},log);
+}
+function tipoPop(e,id){
+  const r=data.find(x=>x.id===id);if(!r)return;
+  showPop(e,`<div style="font-weight:600;margin-bottom:8px">Tipos · ${esc(r.cliente)}</div>
+    <div class="checks" id="tpChecks">${getTipos().map(t=>`<label><input type="checkbox" value="${esc(t)}" ${(r.tipo||[]).includes(t)?'checked':''}>${esc(t)}</label>`).join('')}</div>
+    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:12px"><button class="btn sm" onclick="closePop()">Cancelar</button><button class="btn sm primary" onclick="saveTipoPop('${id}')">Guardar</button></div>`);
+}
+async function saveTipoPop(id){
+  const tipos=[...document.querySelectorAll('#tpChecks input:checked')].map(x=>x.value);closePop();
+  await patchTask(id,{'Tipo de tarefa':{multi_select:tipos.map(n=>({name:n}))}},{tipo:tipos},['Tipos alterados',tipos.join(', ')||'—']);
+}
+function numMenu(e,id){
+  const r=data.find(x=>x.id===id);if(!r)return;
+  showMenu(e,['1','2','3','5','8',''].map(v=>({label:v?('Nº '+v+(r.n===v?' ✓':'')):'Sem número',icon:'tag',fn:()=>patchTask(id,{'Nº':v?{select:{name:v}}:{select:null}},{n:v||null},['Nº alterado',v||'—'])})));
+}
+async function createTask(cliente,mes,tipos,prazo){
+  const props={'Cliente':{title:[{text:{content:cliente}}]},'Status':{status:{name:'Não iniciado'}},'Tipo de tarefa':{multi_select:tipos.map(n=>({name:n}))},'Selecionar':{select:{name:mes}}};
+  if(prazo)props['Prazo']={date:{start:prazo}};
+  const s=await notionReq('/v1/pages','POST',{parent:{database_id:DB_ID},properties:props});
+  data.push({id:s.id,cliente,status:'Não iniciado',n:null,tipo:[...tipos],mes,prazo:prazo||null,url:s.url});
+  logActivity(s.id,'Tarefa criada',tipos.join(', ')||'—');invalidateCache();return s;
+}
+
+/* ══════════ Ficha do cliente (painel lateral) ══════════ */
+function nifOk(v){
+  if(!/^\d{9}$/.test(v))return false;
+  const d=v.split('').map(Number);let t=0;for(let i=0;i<8;i++)t+=d[i]*(9-i);
+  let c=11-(t%11);if(c>=10)c=0;return c===d[8];
+}
+function nifHint(el){
+  const v=el.value.trim(),h=$('drNifHint');
+  h.textContent=v.length===9&&!nifOk(v)?'NIF inválido (dígito de controlo não confere)':'';
+}
+function openDrawer(n){drawerCliente=n;$('drawer').classList.add('open');$('backdrop').classList.add('open');renderDrawer(true)}
+function closeDrawer(){drawerCliente=null;$('drawer').classList.remove('open');$('backdrop').classList.remove('open')}
+function renderDrawer(force){
+  const n=drawerCliente;if(n===null)return;
+  const d=$('drawer');
+  if(!force&&d.contains(document.activeElement)&&/INPUT|TEXTAREA/.test(document.activeElement.tagName))return;
+  const c=getClientData(n),rows=data.filter(r=>r.cliente===n);
+  const months=[...new Set(rows.map(r=>r.mes))].sort((a,b)=>mNum(b)-mNum(a));
+  const late=rows.filter(isLate).length,hasHab=!!(c.tipos&&c.tipos.length)&&!rows.some(r=>r.mes===activeMes);
+  d.innerHTML=`
+    <div class="dr-head"><div class="avatar">${esc(n.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase())}</div>
+      <input class="dr-name" id="drName" value="${esc(n)}" onchange="renameCliente(this.value)" onkeydown="if(event.key==='Enter')this.blur()" aria-label="Nome do cliente" title="Clique para renomear">
+      <button class="btn icon" onclick="closeDrawer()" aria-label="Fechar">${ic('x')}</button></div>
+    <div class="dr-body">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn sm primary" onclick="openEmailCliente(drawerCliente)">${ic('mail')}Preparar email</button>
+        <button class="btn sm" onclick="addTaskFor()">${ic('plus')}Nova tarefa</button>
+        <button class="btn sm" onclick="filterByCliente(drawerCliente);closeDrawer()">Ver na lista</button>
+        <button class="btn sm" onclick="abrirPortal(drawerCliente,'at')">${ic('ext')}Finanças</button>
+        <button class="btn sm" onclick="abrirPortal(drawerCliente,'ss')">${ic('ext')}Seg. Social</button>
+      </div>
+      ${late?`<div class="note" style="margin-top:12px;background:var(--late-soft);color:var(--late)">${late} tarefa(s) em atraso</div>`:''}
+      ${hasHab?`<div class="note" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px">Sem tarefas em ${esc(activeMes)}.<button class="btn sm" onclick="createHabitual()">Criar com os tipos habituais</button></div>`:''}
+      <div class="dr-sec">Contactos <span>guardado automaticamente</span></div>
+      <div class="field"><label for="drEmail">Email</label><input class="input" id="drEmail" type="email" value="${esc(c.email||'')}" placeholder="cliente@email.com" onchange="saveCliField('email',this.value)"></div>
+      <div class="grid2">
+        <div class="field"><label for="drCc">Cc nos emails</label><input class="input" id="drCc" type="email" value="${esc(c.cc||'')}" onchange="saveCliField('cc',this.value)"></div>
+        <div class="field"><label for="drNif">NIF</label><input class="input" id="drNif" inputmode="numeric" maxlength="9" value="${esc(c.nif||'')}" oninput="nifHint(this)" onchange="saveCliField('nif',this.value)"><div class="hint" id="drNifHint"></div></div>
+        <div class="field"><label for="drNiss">NISS</label><input class="input" id="drNiss" inputmode="numeric" maxlength="11" value="${esc(c.niss||'')}" onchange="saveCliField('niss',this.value)"></div>
+      </div>
+      <div class="dr-sec">Acessos aos portais <span>palavras-passe cifradas</span></div>
+      <div id="drCofre"></div>
+      <div class="dr-sec">Tarefas habituais <span>pré-selecionadas ao criar</span></div>
+      <div class="checks" id="drTipos">${getTipos().map(t=>`<label><input type="checkbox" value="${esc(t)}" ${(c.tipos||[]).includes(t)?'checked':''} onchange="saveCliTipos()">${esc(t)}</label>`).join('')}</div>
+      <div class="dr-sec">Tarefas <span>${rows.length} no total</span></div>
+      ${months.length?months.map((m,i)=>{
+        const mr=rows.filter(r=>r.mes===m),done=mr.filter(r=>r.status==='Concluído').length;
+        return `<details class="mo" ${(m===activeMes||(i===0&&!months.includes(activeMes)))?'open':''}><summary>${esc(m)}<small>${done}/${mr.length} concluídas</small></summary>
+          ${mr.map(r=>{const e=ESTADOS.find(x=>x.k===r.status)||ESTADOS[0];
+            return `<div class="row"><div class="grow"><b style="font-weight:600">${(r.tipo||[]).map(esc).join(', ')||'Sem tipo'}</b><span class="meta">${r.prazo?fmtD(r.prazo):'Sem prazo'}${isLate(r)?' · em atraso':''}</span></div>
+              <button class="pill ${e.c}" onclick="statusMenu(event,'${r.id}')">${e.l}</button>
+              <button class="btn icon" onclick="openEdit('${r.id}')" title="Editar tarefa">${ic('edit')}</button></div>`}).join('')}</details>`}).join('')
+        :`<div class="empty" style="padding:24px"><b>Ainda sem tarefas</b>Use “Nova tarefa” para começar.</div>`}
+    </div>`;
+  renderCofreSection();
+}
+function saveCliField(k,v){
+  const n=drawerCliente;v=v.trim();
+  if(k==='nif'&&v&&!nifOk(v)){toast('NIF inválido. Não foi guardado.','error');return}
+  if(k==='niss'&&v&&!/^\d{11}$/.test(v)){toast('O NISS tem 11 dígitos. Não foi guardado.','error');return}
+  const cl=loadClients();cl[n]={...getClientData(n),[k]:v};saveClients(cl);
+  if(k==='email'){if(v)emailsMap[n]=v;else delete emailsMap[n];jset(K.emails,emailsMap);render()}
+  toast('Guardado');
+  if(k==='nif'||k==='niss')renderCofreSection();
+}
+function saveCliTipos(){
+  const n=drawerCliente,cl=loadClients();
+  cl[n]={...getClientData(n),tipos:[...document.querySelectorAll('#drTipos input:checked')].map(x=>x.value)};
+  saveClients(cl);
+}
+function addTaskFor(){openAdd();$('aCliente').value=drawerCliente;onClienteChosen(drawerCliente)}
+async function createHabitual(){
+  const n=drawerCliente,c=getClientData(n);
+  try{await createTask(n,activeMes,c.tipos||[],null);render();toast(`Tarefa criada em ${activeMes}`)}
+  catch(e){toast('Não foi possível criar: '+e.message,'error')}
+}
+function renameCliente(nv){
+  const old=drawerCliente;nv=(nv||'').trim();
+  if(!nv||nv===old){renderDrawer(true);return}
+  if(loadClients()[nv]||data.some(r=>r.cliente===nv)){toast('Já existe um cliente com esse nome','error');renderDrawer(true);return}
+  const rows=data.filter(r=>r.cliente===old),cdata={...getClientData(old)};
+  confirmAction(`Renomear para “${nv}”?`,rows.length?`O nome muda em ${rows.length} tarefa(s), também no Notion.`:'O nome muda apenas na lista de clientes.','Renomear',async()=>{
+    let ok=0;
+    for(const r of rows){
+      try{await notionReq('/v1/pages/'+r.id,'PATCH',{properties:{'Cliente':{title:[{text:{content:nv}}]}}});r.cliente=nv;ok++;toast(`A renomear… ${ok}/${rows.length}`)}
+      catch(e){console.error(e)}
+    }
+    if(ok<rows.length){invalidateCache();render();renderDrawer(true);toast(`Só ${ok} de ${rows.length} tarefas foram renomeadas. Tente de novo.`,'error');return}
+    const cl=loadClients();delete cl[old];cl[nv]=cdata;saveClients(cl);
+    const vv=loadVault();if(vv&&vv.items&&vv.items[old]){vv.items[nv]=vv.items[old];delete vv.items[old];jset(K.vault,vv)}
+    if(emailsMap[old]){emailsMap[nv]=emailsMap[old];delete emailsMap[old];jset(K.emails,emailsMap)}
+    drawerCliente=nv;invalidateCache();render();renderDrawer(true);toast(`Cliente renomeado para ${nv}`);
+  },()=>renderDrawer(true));
+}
+/* ══════════ Cofre de palavras-passe e acesso aos portais ══════════ */
+const PORTAIS={at:{nome:'Finanças',id:'NIF',url:'https://www.portaldasfinancas.gov.pt/at/html/index.html'},ss:{nome:'Segurança Social Direta',id:'NISS',url:'https://app.seg-social.pt/sso/login'}};
+const cryptoOk=!!(window.crypto&&window.crypto.subtle);
+const tenc=new TextEncoder(),tdec=new TextDecoder();
+const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u)));
+const unb64=x=>Uint8Array.from(atob(x),c=>c.charCodeAt(0));
+let vaultKey=null,vaultTimer=null,cofreResolve=null,clipT=null;
+const loadVault=()=>jget(K.vault,null);
+async function deriveKey(pass,salt){
+  const km=await crypto.subtle.importKey('raw',tenc.encode(pass),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encObj(key,obj){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,tenc.encode(JSON.stringify(obj)));
+  return{iv:b64(iv),ct:b64(ct)};
+}
+async function decObj(key,o){
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(o.iv)},key,unb64(o.ct));
+  return JSON.parse(tdec.decode(pt));
+}
+function touchVault(){clearTimeout(vaultTimer);vaultTimer=setTimeout(()=>lockVault(true),15*60*1000)}
+function lockVault(auto){vaultKey=null;clearTimeout(vaultTimer);renderCofreSection();toast(auto?'Cofre bloqueado por inatividade':'Cofre bloqueado')}
+function ensureUnlocked(){
+  if(vaultKey){touchVault();return Promise.resolve(true)}
+  return new Promise(res=>{cofreResolve=res;openCofreModal()});
+}
+function openCofreModal(){
+  const setup=!loadVault();
+  $('cofreTitle').textContent=setup?'Criar cofre':'Desbloquear cofre';
+  $('cofreMsg').textContent=setup?'As palavras-passe ficam cifradas neste navegador com uma palavra-passe mestra. Se a perder, não é possível recuperá-las.':'Introduza a palavra-passe mestra.';
+  $('cofreConfWrap').hidden=!setup;$('cofreOk').textContent=setup?'Criar cofre':'Desbloquear';
+  $('cofrePass').value='';$('cofrePass2').value='';$('cofreErr').textContent='';
+  openModal('cofreModal');setTimeout(()=>$('cofrePass').focus(),60);
+}
+function cancelCofre(){closeModal('cofreModal');if(cofreResolve){cofreResolve(false);cofreResolve=null}}
+async function submitCofre(){
+  const pass=$('cofrePass').value,v=loadVault(),err=$('cofreErr');
+  if(!cryptoOk){err.textContent='Este navegador não suporta cifragem. Abra a app por https ou localhost.';return}
+  $('cofreOk').disabled=true;
+  try{
+    if(!v){
+      if(pass.length<8){err.textContent='Use pelo menos 8 caracteres.';return}
+      if(pass!==$('cofrePass2').value){err.textContent='As palavras-passe não coincidem.';return}
+      const salt=crypto.getRandomValues(new Uint8Array(16)),key=await deriveKey(pass,salt);
+      jset(K.vault,{v:1,salt:b64(salt),check:await encObj(key,{ok:1}),items:{}});vaultKey=key;
+    }else{
+      const key=await deriveKey(pass,unb64(v.salt));
+      try{await decObj(key,v.check)}catch(e){err.textContent='Palavra-passe mestra incorreta.';return}
+      vaultKey=key;
+    }
+    touchVault();closeModal('cofreModal');renderCofreSection();
+    if(cofreResolve){cofreResolve(true);cofreResolve=null}
+  }finally{$('cofreOk').disabled=false}
+}
+$('cofreModal').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.tagName==='INPUT'){e.preventDefault();submitCofre()}});
+
+async function renderCofreSection(){
+  const n=drawerCliente,box=$('drCofre');if(n===null||!box)return;
+  const v=loadVault();
+  if(!cryptoOk){box.innerHTML='<div class="note">A cifragem não está disponível neste navegador. Abra a app por https ou localhost para usar o cofre.</div>';return}
+  if(!v){
+    box.innerHTML=`<div class="note" style="background:var(--panel2);color:var(--ink2)">Guarde aqui as palavras-passe dos portais. Ficam cifradas apenas neste navegador e nunca seguem para o Notion.
+      <div style="display:flex;gap:6px;margin-top:10px"><button class="btn sm primary" onclick="ensureUnlocked()">${ic('lock')}Criar cofre</button><button class="btn sm" onclick="importCofre()">Importar cópia</button></div></div>`;return;
+  }
+  if(!vaultKey){
+    box.innerHTML=`<div class="note" style="background:var(--panel2);color:var(--ink2)">O cofre está bloqueado.
+      <div style="display:flex;gap:6px;margin-top:10px"><button class="btn sm primary" onclick="ensureUnlocked()">${ic('lock')}Desbloquear</button><button class="btn sm" onclick="importCofre()">Importar cópia</button></div></div>`;return;
+  }
+  let cr={};
+  if(v.items[n]){try{cr=await decObj(vaultKey,v.items[n])}catch(e){}}
+  if(drawerCliente!==n||!$('drCofre')||!vaultKey)return;
+  const c=getClientData(n);
+  const bloco=(t,titulo,idTxt,campo)=>`<div class="cred"><div class="cred-h"><b>${titulo}</b><span>${idTxt}</span></div>
+    <div class="cred-row"><input class="input" type="password" id="${campo}" value="${esc(cr[t]||'')}" placeholder="Palavra-passe" autocomplete="new-password" onchange="saveCred('${t}',this.value)">
+      <button class="btn icon" type="button" onclick="togglePass('${campo}')" title="Mostrar ou ocultar">${ic('eye')}</button>
+      <button class="btn icon" type="button" onclick="copyPass(drawerCliente,'${t}')" title="Copiar palavra-passe">${ic('copy')}</button></div>
+    <div class="cred-act"><button class="btn sm primary" onclick="abrirPortal(drawerCliente,'${t}')">Abrir ${PORTAIS[t].nome} e copiar o ${PORTAIS[t].id}</button></div></div>`;
+  $('drCofre').innerHTML=bloco('at','Finanças',c.nif?'NIF '+esc(c.nif):'Sem NIF. Preencha-o acima.','drPassAt')+
+    bloco('ss','Segurança Social Direta',c.niss?'NISS '+esc(c.niss):'Sem NISS. Preencha-o acima.','drPassSs')+
+    `<div class="cred-foot"><button class="btn sm" onclick="lockVault()">${ic('lock')}Bloquear</button><button class="btn sm" onclick="exportCofre()">Exportar cópia</button><button class="btn sm" onclick="importCofre()">Importar cópia</button></div>`;
+}
+async function saveCred(tipo,val){
+  if(!vaultKey)return;const n=drawerCliente;if(n===null)return;
+  try{
+    let cr={};const v0=loadVault();
+    if(v0&&v0.items[n]){try{cr=await decObj(vaultKey,v0.items[n])}catch(e){}}
+    cr[tipo]=val;
+    const blob=(cr.at||cr.ss)?await encObj(vaultKey,cr):null;
+    const v=loadVault();if(!v)return;
+    if(blob)v.items[n]=blob;else delete v.items[n];
+    jset(K.vault,v);touchVault();toast('Guardado no cofre');
+  }catch(e){toast('Não foi possível guardar no cofre','error')}
+}
+function togglePass(id){const i=$(id);if(i)i.type=i.type==='password'?'text':'password'}
+async function copyText(t,limpar){
+  try{await navigator.clipboard.writeText(t)}
+  catch(e){toast('Não foi possível copiar. Permita o acesso à área de transferência.','error');return false}
+  if(limpar){clearTimeout(clipT);clipT=setTimeout(()=>{navigator.clipboard.writeText('').catch(()=>{})},30000)}
+  return true;
+}
+async function copyPass(nome,tipo){
+  if(!await ensureUnlocked())return;
+  const v=loadVault();let cr={};
+  try{if(v&&v.items[nome])cr=await decObj(vaultKey,v.items[nome])}catch(e){}
+  if(!cr[tipo]){toast(`Sem palavra-passe guardada para ${PORTAIS[tipo].nome}.`,'error');return}
+  touchVault();
+  if(await copyText(cr[tipo],true))toast('Palavra-passe copiada. A área de transferência é limpa em 30 s.');
+}
+async function abrirPortal(nome,tipo){
+  const pt=PORTAIS[tipo],c=getClientData(nome),idv=((tipo==='at'?c.nif:c.niss)||'').trim();
+  const cp=idv?copyText(idv):null; /* a cópia começa antes de mudar de separador */
+  window.open(pt.url,'_blank','noopener');
+  if(!idv){toast(`${nome} não tem ${pt.id} guardado. Preencha-o na ficha do cliente.`,'error');return}
+  if(await cp)toast(`${pt.id} copiado. Cole-o no portal.`,'',()=>copyPass(nome,tipo),'Copiar palavra-passe',25000);
+}
+function exportCofre(){
+  const v=loadVault();if(!v)return;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(v)],{type:'application/json'}));
+  a.download='cofre-prestacoes-'+toIso(new Date())+'.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  toast('Cópia cifrada exportada. Guarde-a num local seguro.');
+}
+function importCofre(){
+  const f=document.createElement('input');f.type='file';f.accept='application/json,.json';
+  f.onchange=async()=>{
+    try{
+      const v=JSON.parse(await f.files[0].text());
+      if(!(v&&v.v===1&&v.salt&&v.check&&v.items&&typeof v.items==='object'))throw new Error('formato');
+      const has=!!loadVault();
+      confirmAction('Importar cofre?',has?'O cofre deste navegador será substituído pelo do ficheiro. As palavras-passe que só existam aqui serão perdidas.':'Vai usar a palavra-passe mestra do ficheiro.','Importar',()=>{
+        jset(K.vault,v);vaultKey=null;clearTimeout(vaultTimer);renderCofreSection();toast('Cofre importado. Desbloqueie-o com a palavra-passe mestra.');
+      });
+    }catch(e){toast('O ficheiro não é um cofre válido','error')}
+  };
+  f.click();
+}
+
+/* Enter para guardar nos formulários */
+$('entryModal').addEventListener('keydown',e=>{
+  if(e.key!=='Enter'||e.target.tagName!=='INPUT'||e.target.type==='checkbox'||e.target.id==='aCliente')return;
+  e.preventDefault();e.target.id==='aNovoTipo'?addCustomTipo():saveEntry();
+});
+$('clienteModal').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.tagName==='INPUT'&&e.target.type!=='checkbox'){e.preventDefault();saveClienteModal()}});
+
 /* ══════════ Utilitários de interface ══════════ */
 function openModal(id){$(id).classList.add('open')}
 function closeModal(id){$(id).classList.remove('open')}
 document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('mousedown',e=>{if(e.target===o)o.classList.remove('open')}));
-function confirmAction(title,msg,label,cb){
+let confirmCancel=null;
+function confirmAction(title,msg,label,cb,onCancel){
+  confirmCancel=onCancel||null;
   $('confirmTitle').textContent=title;$('confirmMsg').textContent=msg;$('confirmOk').textContent=label;
-  $('confirmOk').onclick=()=>{closeModal('confirmOverlay');cb()};openModal('confirmOverlay');setTimeout(()=>$('confirmOk').focus(),50);
+  $('confirmOk').onclick=()=>{confirmCancel=null;closeModal('confirmOverlay');cb()};openModal('confirmOverlay');setTimeout(()=>$('confirmOk').focus(),50);
 }
+function cancelConfirm(){closeModal('confirmOverlay');const f=confirmCancel;confirmCancel=null;if(f)f()}
 let toastT;
-function toast(msg,type='',undo=null){
+function toast(msg,type='',undo=null,label='Desfazer',ms=0){
   const t=$('toast');t.className='';t.textContent=msg;
-  if(undo){const b=document.createElement('button');b.textContent='Desfazer';b.onclick=()=>{undo();t.classList.remove('show')};t.appendChild(b)}
+  if(undo){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{undo();t.classList.remove('show')};t.appendChild(b)}
   if(type)t.classList.add(type);
   requestAnimationFrame(()=>t.classList.add('show'));
-  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),undo?6000:3200);
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),ms||(undo?6000:3200));
 }
 document.querySelectorAll('th.sort').forEach(th=>th.addEventListener('click',()=>sortBy(th.dataset.sort)));
 let st;$('fSearch').addEventListener('input',()=>{clearTimeout(st);st=setTimeout(renderMain,120)});
 document.addEventListener('keydown',e=>{
-  if(e.key==='Escape'){document.querySelectorAll('.overlay.open').forEach(o=>o.classList.remove('open'));$('menu').classList.remove('open');return}
+  if(e.key==='Escape'){
+    const hadOv=!!document.querySelector('.overlay.open'),hadPop=$('pop').classList.contains('open')||$('menu').classList.contains('open');
+    document.querySelectorAll('.overlay.open').forEach(o=>o.classList.remove('open'));$('menu').classList.remove('open');closePop();
+    if(!hadOv&&!hadPop)closeDrawer();return}
   const typing=/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
   if(typing||e.ctrlKey||e.metaKey||e.altKey||document.querySelector('.overlay.open'))return;
   if(e.key==='/'){e.preventDefault();if(currentTab!=='main')switchTab('main');$('fSearch').focus()}
